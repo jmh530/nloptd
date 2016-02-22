@@ -7,7 +7,7 @@
 	"dependencies": {
 		"libnlopt": ">=0.2.0",
 	},
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"dflags-windows-x86-dmd": ["-m32mscoff"],
 	"configurations": [
 		{
