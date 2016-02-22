@@ -2,11 +2,6 @@ nloptd
 ====
 **A D-style wrapper over libnlopt**
 
-Features
---------
-
-* TODO
-
 ## Installation Notes
 -------
 Ensure that the libnlopt dependency is installed properly. This may involve 
@@ -21,7 +16,8 @@ import nloptd;
 
 import std.math : sqrt;
 
-double myfunc(uint n, const(double)* x, double* grad, void* my_func_data)
+extern(C) double myfunc(
+	uint n, const(double)* x, double* grad, void* my_func_data)
 {
     if (grad)
 	{
@@ -37,7 +33,8 @@ struct my_constraint_data
 	double b;
 }
 
-double myconstraint(uint n, const(double)* x, double* grad, void* data)
+extern(C) double myconstraint(
+	uint n, const(double)* x, double* grad, void* data)
 {
     my_constraint_data* d = cast(my_constraint_data*) data;
     double a = d.a;
