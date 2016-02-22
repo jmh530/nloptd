@@ -1,11 +1,12 @@
 nloptd
 ====
-**A D-style wrapper over libnlopt**
+**A D-style wrapper for [nlopt](http://ab-initio.mit.edu/wiki/index.php/NLopt)**
 
 ## Installation Notes
 -------
-Ensure that the libnlopt dependency is installed properly. This may involve 
-building C lib/dll, depending on platform or compiler. 
+Ensure that the [libnlopt](https://github.com/jmh530/libnlopt) dependency is 
+installed properly. This may involve building C lib/dll, depending on platform 
+or compiler. 
 
 ## Example
 -------
