@@ -1,0 +1,25 @@
+{
+	"name" : "nloptd",
+	"description": "A D-style wrapper over libnlopt",
+	"authors": ["John Michael Hall"],
+	"license": "LGPL-2.1 or later",
+	"copyright": "Copyright © 2016, John Michael Hall",
+	"dependencies": {
+		"libnlopt": ">=0.2.0",
+	},
+	"version": "0.2.0",
+	"dflags-windows-x86-dmd": ["-m32mscoff"],
+	"configurations": [
+		{
+			"name": "nloptd-library",
+			"targetType": "library",
+			"version": ["NloptDLibrary"],
+		},
+		{
+			"name": "example",
+			"targetType": "executable",
+			"version": ["ExampleApp"],
+			"sourceFiles": ["example/example.d"],
+		}
+	],
+}
