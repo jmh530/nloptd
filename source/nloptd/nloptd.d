@@ -618,7 +618,7 @@ struct Opt
 	 * ----
 	 * Params:
 	 * 
-	 * f = function pointer representing objective
+	 * f = function pointer representing objective, must be extern(C)
 	 *
 	 * f_data = additional data to pass to function (optional)
 	 * ----
@@ -683,7 +683,7 @@ struct Opt
 	 * ----
 	 * Params:
 	 * 
-	 * f = function pointer representing objective
+	 * f = function pointer representing objective, must be extern(C)
 	 *
 	 * f_data = additional data to pass to function (optional)
 	 * ----
@@ -752,9 +752,10 @@ struct Opt
 	 * ----
 	 * Params:
 	 * 
-	 * f = function pointer representing objective
+	 * f = function pointer representing objective, must be extern(C)
 	 * 
-	 * pre = function pointer representing preconditioner function
+	 * pre = function pointer representing preconditioner function, must be 
+			 extern(C)
 	 *
 	 * f_data = additional data to pass to function (optional)
 	 * ----
@@ -788,9 +789,10 @@ struct Opt
 	 * ----
 	 * Params:
 	 * 
-	 * f = function pointer representing objective
+	 * f = function pointer representing objective, must be extern(C)
 	 * 
-	 * pre = function pointer representing preconditioner function
+	 * pre = function pointer representing preconditioner function, must be 
+			 extern(C)
 	 *
 	 * f_data = additional data to pass to function (optional)
 	 * ----
@@ -1628,7 +1630,7 @@ struct Opt
 	 * ----
 	 * Params:
 	 *
-	 * fc = function pointer representing constraint
+	 * fc = function pointer representing constraint, must be extern(C)
 	 *
 	 * fc_data = additional data to pass to function (optional)
 	 *
@@ -1700,9 +1702,10 @@ struct Opt
 	 * ----
 	 * Params: (TODO)
 	 *
-	 * fc = function pointer representing constraint
+	 * fc = function pointer representing constraint, must be extern(C)
 	 * 
-	 * pre = function pointer representing preconditioner function
+	 * pre = function pointer representing preconditioner function, must be 
+			 extern(C)
 	 *
 	 * fc_data = additional data to pass to functions (optional)
 	 *
@@ -1751,7 +1754,7 @@ struct Opt
 	 *
 	 * m = number of constraints
 	 *
-	 * fc = function pointer representing constraints
+	 * fc = function pointer representing constraints, must be extern(C)
 	 *
 	 * fc_data = additional data to pass to function (optional)
 	 *
@@ -1889,7 +1892,7 @@ struct Opt
 	 * ----
 	 * Params:
 	 *
-	 * fc = function pointer representing constraint
+	 * fc = function pointer representing constraint, must be extern(C)
 	 *
 	 * fc_data = additional data to pass to function (optional)
 	 *
@@ -1961,9 +1964,10 @@ struct Opt
 	 * ----
 	 * Params: (TODO)
 	 *
-	 * fc = function pointer representing constraint
+	 * fc = function pointer representing constraint, must be extern(C)
 	 *
-	 * pre = function pointer representing preconditioner function
+	 * pre = function pointer representing preconditioner function, must be 
+		     extern(C)
 	 *
 	 * fc_data = additional data to pass to functions (optional)
 	 *
@@ -2007,7 +2011,7 @@ struct Opt
 	 *
 	 * m = number of constraints
 	 *
-	 * fc = function pointer representing constraints
+	 * fc = function pointer representing constraints, must be extern(C)
 	 *
 	 * fc_data = additional data to pass to function (optional)
 	 *
