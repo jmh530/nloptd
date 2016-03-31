@@ -129,7 +129,6 @@ private
 		if (isFunctionPointer!T || isDelegate!T)
 	{
 		import libnlopt : nlopt_mfunc;
-		
 
 		static if (is(T == nlopt_mfunc))
 		{
@@ -313,9 +312,6 @@ enum defaultTol : double
 	XTolRel		= 1e-4,
 	XTolAbs		= 1e-4,
 }
-
-
-								
 
 
 /**************************************
@@ -504,12 +500,9 @@ struct Opt
 	 */
 	void optimize(T)(ref T x, ref double minf)
 		if (isDoubleForeach!T)
-	in
 	{
 		assert(getDimension() == x.length, "the length of x must equal n");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_optimize;
 		
 		processResult(
@@ -1146,12 +1139,9 @@ struct Opt
 	 */
 	void setLowerBounds(T)(ref T lb)
 		if (isDoubleForeach!T)
-	in
 	{
 		assert(getDimension() == lb.length, "the length of lb must equal n");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_lower_bounds;
 		
 		processResult(
@@ -1226,13 +1216,10 @@ struct Opt
 	 */
 	void getLowerBounds(T)(ref T lb)
 		if (is(ForeachType!T == double))
-	in
 	{
 		assert(lb.length == getDimension(), 
 			"length must match dimension of optimization");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_get_lower_bounds;
 		
 		nlopt_get_lower_bounds(_opt, &lb[0]);
@@ -1377,13 +1364,10 @@ struct Opt
 	 */
 	void setUpperBounds(T)(ref T ub)
 		if (isDoubleForeach!T)
-	in
 	{
 		assert(this.getDimension() == ub.length, 
 			"the length of ub must equal n");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_upper_bounds;
 	
 		processResult(
@@ -1457,13 +1441,10 @@ struct Opt
 	 */
 	void getUpperBounds(T)(ref T ub)
 		if (is(ForeachType!T == double))
-	in
 	{
 		assert(ub.length == getDimension(), 
 			"length must match dimension of optimization");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_get_upper_bounds;
 
 		nlopt_get_upper_bounds(_opt, &ub[0]);
@@ -1639,12 +1620,9 @@ struct Opt
 	 */
 	void addInequalityConstraint(T, U)(
 		T fc, ref U fc_data, const double tol = defaultTol.inequality)
-	in
 	{
 		assert(tol >= 0, "tol must be >= zero");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_add_inequality_constraint;
 	
 		processResult(
@@ -1715,12 +1693,9 @@ struct Opt
 	void addPrecondInequalityConstraint(T, U, V)(
 		T fc, U pre, ref V fc_data, 
 			const double tol = defaultTol.inequality)
-	in
 	{
 		assert(tol >= 0, "tol must be >= zero");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_add_precond_inequality_constraint;
 	
 		processResult(
@@ -1729,12 +1704,9 @@ struct Opt
 	}
 	
 	void addPrecondInequalityConstraint(T, U, V)(T fc, U pre)
-	in
 	{
 		assert(tol >= 0, "tol must be >= zero");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_add_precond_inequality_constraint;
 	
 		processResult(
@@ -1765,16 +1737,13 @@ struct Opt
 	void addInequalityMConstraint(T, U, V)(
 			uint m, T fc, ref U fc_data, ref const V tol)
 		if (isDoubleForeach!V)
-	in
 	{
 		assert(m == tol.length, "tol must be the same dimension as m");
 		foreach (i, t; tol)
 		{
 			assert(t >= 0, "values of tol must be >= 0");
 		}
-	}
-	body
-	{
+
 		import libnlopt : nlopt_add_inequality_mconstraint;
 	
 		processResult(
@@ -1901,12 +1870,9 @@ struct Opt
 	 */
 	void addEqualityConstraint(T, U)(
 		T fc, ref U fc_data, const double tol = defaultTol.equality)
-	in
 	{
 		assert(tol >= 0, "tol must be >= zero");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_add_equality_constraint;
 	
 		processResult(
@@ -1977,12 +1943,9 @@ struct Opt
 	void addPrecondEqualityConstraint(T, U, V...)(
 		T fc, U pre, ref V fc_data, 
 		const double tol = defaultTol.equality)
-	in
 	{
 		assert(tol >= 0, "tol must be >= zero");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_add_precond_equality_constraint;
 	
 		processResult(
@@ -2022,16 +1985,13 @@ struct Opt
 	void addEqualityMConstraint(T, U, V)(
 			uint m, T fc, ref U fc_data, ref const V tol)
 		if (isDoubleForeach!V)
-	in
 	{
 		assert(m == tol.length, "tol must be the same dimension as m");
 		foreach (i, t; tol)
 		{
 			assert(t >= 0, "values of tol must be >= 0");
 		}
-	}
-	body
-	{
+
 		import libnlopt : nlopt_add_equality_mconstraint;
 		
 		processResult(
@@ -2188,12 +2148,9 @@ struct Opt
 	 * ----
 	 */
 	void setFTolRel(const double tol = defaultTol.FTolRel)
-	in
 	{
 		assert(tol >= 0, "tol must be >= 0");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_ftol_rel;
 	
 		processResult(
@@ -2246,12 +2203,9 @@ struct Opt
 	 * ----
 	 */
 	void setFTolAbs(const double tol = defaultTol.FTolAbs)
-	in
 	{
 		assert(tol >= 0, "tol must be >= 0");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_ftol_abs;
 	
 		processResult(
@@ -2304,12 +2258,9 @@ struct Opt
 	 * ----
 	 */
 	void setXTolRel(const double tol = defaultTol.XTolRel)
-	in
 	{
 		assert(tol >= 0, "tol must be >= 0");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_xtol_rel;
 		
 		processResult(
@@ -2363,16 +2314,13 @@ struct Opt
 	 */
 	void setXTolAbs(T)(ref const T tol)
 		if (isDoubleForeach!T)
-	in
 	{
 		assert(getDimension() == tol.length, "the length of tol must equal n");
 		foreach (i, t; tol)
 		{
 			assert(t >= 0, "values of tol must be >= 0");
 		}
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_xtol_abs;
 		
 		processResult(
@@ -2381,12 +2329,9 @@ struct Opt
 	
 	/// ditto
 	void setXTolAbs(const double tol = defaultTol.XTolAbs)
-	in
 	{
 		assert(tol >= 0, "tol must be >= 0");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_xtol_abs1;
 	
 		processResult(
@@ -2438,12 +2383,9 @@ struct Opt
 	 */
 	void getXTolAbs(T)(ref T tol)
 		if (isDoubleForeach!T)
-	in
 	{
 		assert(getDimension() == tol.length, "the length of tol must equal n");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_get_xtol_abs;
 		
 		processResult(
@@ -2497,12 +2439,9 @@ struct Opt
 	 * ----
 	 */
 	void setMaxeval(const int maxeval)
-	in
 	{
 		assert(maxeval >= 0, "maxval must be >= 0");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_maxeval;
 		
 		processResult(
@@ -2554,12 +2493,9 @@ struct Opt
 	 * ----
 	 */
 	void setMaxtime(const double maxtime)
-	in
 	{
 		assert(maxtime >= 0, "maxtime must be >= 0");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_maxtime;
 		
 		processResult(
@@ -2630,12 +2566,9 @@ struct Opt
 	 * ----
 	 */
 	void setForceStop(const int val)
-	in
 	{
 		assert(val >= 0, "val must be >= 0");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_force_stop;
 		
 		processResult(
@@ -2833,12 +2766,9 @@ struct Opt
 	 */
 	void setDefaultInitialStep(T)(ref T dx)
 		if (isDoubleForeach!T)
-	in
 	{
 		assert(getDimension() == dx.length, "the length of dx must equal n");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_default_initial_step;
 		
 		processResult(
@@ -2847,12 +2777,9 @@ struct Opt
 	
 	/// ditto
 	void setDefaultInitialStep(ref double dx)
-	in
 	{
 		assert(getDimension() == 1, "the length of dx must equal n");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_default_initial_step;
 		
 		processResult(
@@ -2920,12 +2847,9 @@ struct Opt
 	 */
 	void setInitialStep(T)(ref T dx)
 		if (isDoubleForeach!T)
-	in
 	{
 		assert(getDimension() == dx.length, "the length of dx must equal n");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_initial_step;
 		
 		processResult(
@@ -2934,12 +2858,9 @@ struct Opt
 	
 	/// ditto
 	void setInitialStep(const double dx)
-	in
 	{
 		assert(dx >= 0, "the value of dx must be >= 0");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_set_initial_step1;
 		
 		processResult(
@@ -3017,15 +2938,12 @@ struct Opt
 	 */
 	void getInitialStep(T, U)(ref T x, ref U dx)
 		if (isDoubleForeach!T && isDoubleForeach!U)
-	in
 	{
 		assert(getDimension() == x.length, 
 			"the length of x must equal n");
 		assert(x.length == dx.length, 
 			"the length of x must equal the length of dx");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_get_initial_step;
 		
 		processResult(
@@ -3034,12 +2952,9 @@ struct Opt
 	
 	/// ditto
 	void getInitialStep(ref double x, ref double dx)
-	in
 	{
 		assert(getDimension() == 1, "the length of dx must equal n");
-	}
-	body
-	{
+
 		import libnlopt : nlopt_get_initial_step;
 		
 		processResult(
