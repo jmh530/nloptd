@@ -3264,7 +3264,7 @@ version(unittest)
 		double b;
 	}
 
-	extern(C) @nogc nothrow double myFuncC(
+	extern(C) double myFuncC(
 		uint n, const(double)* x, double* gradient, void* func_data)
 	{
 		import std.math : sqrt;
@@ -3277,7 +3277,7 @@ version(unittest)
 		return sqrt(x[1]);
 	}
 	
-	extern(C) @nogc nothrow double myConstraintC(
+	extern(C) double myConstraintC(
 		uint n, const(double)* x, double* gradient, void* data)
 	{
 		my_constraint_data* d = cast(my_constraint_data*) data;
@@ -3291,7 +3291,7 @@ version(unittest)
 		return ((a * x[0] + b) * (a * x[0] + b) * (a * x[0] + b) - x[1]);
 	}
 	
-	extern(C) @nogc nothrow void myConstraintMC(uint m, double* result, uint n, 
+	extern(C) void myConstraintMC(uint m, double* result, uint n, 
 		const(double)* x, double* gradient, void* func_data)
 	{
 		  my_constraint_data* d = cast(my_constraint_data*) func_data;
