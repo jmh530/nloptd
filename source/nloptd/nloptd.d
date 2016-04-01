@@ -15,8 +15,7 @@
 
 module nloptd;
 
-import libnlopt : nlopt_algorithm, nlopt_result;
-import libnlopt.aliases;
+import nlopt : nlopt_algorithm, nlopt_result;
 
 
 private
@@ -53,7 +52,7 @@ private
 	auto processFP(T)(T t)
 		if (isFunctionPointer!T || isDelegate!T)
 	{
-		import libnlopt : nlopt_func;
+		import nlopt : nlopt_func;
 		
 
 		static if (is(T == nlopt_func))
@@ -91,7 +90,7 @@ private
 	auto processFPPre(T)(T t)
 		if (isFunctionPointer!T || isDelegate!T)
 	{
-		import libnlopt : nlopt_precond;
+		import nlopt : nlopt_precond;
 		
 		static if (is(T == nlopt_precond))
 		{
@@ -128,7 +127,7 @@ private
 	auto processFPM(T)(T t)
 		if (isFunctionPointer!T || isDelegate!T)
 	{
-		import libnlopt : nlopt_mfunc;
+		import nlopt : nlopt_mfunc;
 
 		static if (is(T == nlopt_mfunc))
 		{
@@ -327,8 +326,7 @@ struct Opt
 	
 	private
 	{
-		import libnlopt : nlopt_opt;
-		import libnlopt : nlopt_result;
+		import nlopt : nlopt_opt, nlopt_result;
 		
 		nlopt_opt _opt;
 		nlopt_result _result;
@@ -377,7 +375,7 @@ struct Opt
 	 */
 	void create(const Algorithm algorithm, const uint n)
 	{
-		import libnlopt : nlopt_create;
+		import nlopt : nlopt_create;
 		
 		_opt = nlopt_create(algorithm, n);
 	}
@@ -397,7 +395,7 @@ struct Opt
 	 */
 	~this()
 	{
-		import libnlopt : nlopt_destroy;
+		import nlopt : nlopt_destroy;
 
 		nlopt_destroy(_opt);
 	}
@@ -418,7 +416,7 @@ struct Opt
 	 */
 	void srand(uint seed)
 	{
-		import libnlopt : nlopt_srand;
+		import nlopt : nlopt_srand;
 		
 		nlopt_srand(seed);
 	}
@@ -437,7 +435,7 @@ struct Opt
 	 */
 	void srandTime()
 	{
-		import libnlopt : nlopt_srand_time;
+		import nlopt : nlopt_srand_time;
 		
 		nlopt_srand_time();
 	}
@@ -458,7 +456,7 @@ struct Opt
 	 */
 	auto copy()
 	{
-		import libnlopt : nlopt_copy;
+		import nlopt : nlopt_copy;
 		
 		auto opt = Opt(nlopt_copy(_opt));
 		opt._result = this._result;
@@ -503,7 +501,7 @@ struct Opt
 	{
 		assert(getDimension() == x.length, "the length of x must equal n");
 
-		import libnlopt : nlopt_optimize;
+		import nlopt : nlopt_optimize;
 		
 		processResult(
 			nlopt_optimize(_opt, &x[0], &minf));
@@ -618,7 +616,7 @@ struct Opt
 	 */
 	void setMinObjective(T, U...)(T f, ref U f_data)
 	{
-		import libnlopt : nlopt_set_min_objective;
+		import nlopt : nlopt_set_min_objective;
 		
 		static if (f_data.length == 1)
 			auto f_data_ = &f_data[0];
@@ -683,7 +681,7 @@ struct Opt
 	 */
 	void setMaxObjective(T, U...)(T f, ref U f_data)
 	{
-		import libnlopt : nlopt_set_max_objective;
+		import nlopt : nlopt_set_max_objective;
 		
 		static if (f_data.length == 1)
 			auto f_data_ = &f_data[0];
@@ -756,7 +754,7 @@ struct Opt
 	void setPrecondMinObjective(T, U, V...)(
 		T f, U pre, ref V f_data)
 	{
-		import libnlopt : nlopt_set_precond_min_objective;
+		import nlopt : nlopt_set_precond_min_objective;
 		
 		static if (f_data.length == 1)
 			auto f_data_ = &f_data[0];
@@ -793,7 +791,7 @@ struct Opt
 	void setPrecondMaxObjective(T, U, V...)(
 		T f, U pre, ref V f_data)
 	{
-		import libnlopt : nlopt_set_precond_max_objective;
+		import nlopt : nlopt_set_precond_max_objective;
 		
 		static if (f_data.length == 1)
 			auto f_data_ = &f_data[0];
@@ -817,7 +815,7 @@ struct Opt
 	 */
 	auto getAlgorithmRaw()
 	{
-		import libnlopt : nlopt_get_algorithm;
+		import nlopt : nlopt_get_algorithm;
 		
 		return nlopt_get_algorithm(_opt);
 	}
@@ -1112,7 +1110,7 @@ struct Opt
 	 */
 	auto getDimension()
 	{
-		import libnlopt : nlopt_get_dimension;
+		import nlopt : nlopt_get_dimension;
 		
 		return nlopt_get_dimension(_opt);
 	}
@@ -1142,7 +1140,7 @@ struct Opt
 	{
 		assert(getDimension() == lb.length, "the length of lb must equal n");
 
-		import libnlopt : nlopt_set_lower_bounds;
+		import nlopt : nlopt_set_lower_bounds;
 		
 		processResult(
 			nlopt_set_lower_bounds(_opt, &lb[0]));
@@ -1151,7 +1149,7 @@ struct Opt
 	/// ditto	
 	void setLowerBounds(double lb)
 	{
-		import libnlopt : nlopt_set_lower_bounds1;
+		import nlopt : nlopt_set_lower_bounds1;
 		
 		processResult(
 			nlopt_set_lower_bounds1(_opt, lb));
@@ -1220,7 +1218,7 @@ struct Opt
 		assert(lb.length == getDimension(), 
 			"length must match dimension of optimization");
 
-		import libnlopt : nlopt_get_lower_bounds;
+		import nlopt : nlopt_get_lower_bounds;
 		
 		nlopt_get_lower_bounds(_opt, &lb[0]);
 	}
@@ -1228,7 +1226,7 @@ struct Opt
 	/// ditto
 	void getLowerBounds()(ref double lb)
 	{
-		import libnlopt : nlopt_get_lower_bounds;
+		import nlopt : nlopt_get_lower_bounds;
 		
 		nlopt_get_lower_bounds(_opt, &lb);
 	}
@@ -1368,7 +1366,7 @@ struct Opt
 		assert(this.getDimension() == ub.length, 
 			"the length of ub must equal n");
 
-		import libnlopt : nlopt_set_upper_bounds;
+		import nlopt : nlopt_set_upper_bounds;
 	
 		processResult(
 			nlopt_set_upper_bounds(_opt, &ub[0]));
@@ -1377,7 +1375,7 @@ struct Opt
 	/// ditto
 	void setUpperBounds(double ub)
 	{
-		import libnlopt : nlopt_set_upper_bounds1;
+		import nlopt : nlopt_set_upper_bounds1;
 	
 		processResult(
 			nlopt_set_upper_bounds1(_opt, ub));
@@ -1445,7 +1443,7 @@ struct Opt
 		assert(ub.length == getDimension(), 
 			"length must match dimension of optimization");
 
-		import libnlopt : nlopt_get_upper_bounds;
+		import nlopt : nlopt_get_upper_bounds;
 
 		nlopt_get_upper_bounds(_opt, &ub[0]);
 	}
@@ -1453,7 +1451,7 @@ struct Opt
 	/// ditto
 	void getUpperBounds(ref double ub)
 	{
-		import libnlopt : nlopt_get_upper_bounds;
+		import nlopt : nlopt_get_upper_bounds;
 
 		nlopt_get_upper_bounds(_opt, &ub);
 	}
@@ -1585,7 +1583,7 @@ struct Opt
 	 */
 	void removeInequalityConstraints()
 	{
-		import libnlopt : nlopt_remove_inequality_constraints;
+		import nlopt : nlopt_remove_inequality_constraints;
 	
 		processResult(
 			nlopt_remove_inequality_constraints(_opt));
@@ -1623,7 +1621,7 @@ struct Opt
 	{
 		assert(tol >= 0, "tol must be >= zero");
 
-		import libnlopt : nlopt_add_inequality_constraint;
+		import nlopt : nlopt_add_inequality_constraint;
 	
 		processResult(
 			nlopt_add_inequality_constraint(
@@ -1632,7 +1630,7 @@ struct Opt
 	
 	void addInequalityConstraint(T)(T fc)
 	{
-		import libnlopt : nlopt_add_inequality_constraint;
+		import nlopt : nlopt_add_inequality_constraint;
 	
 		processResult(
 			nlopt_add_inequality_constraint(
@@ -1696,7 +1694,7 @@ struct Opt
 	{
 		assert(tol >= 0, "tol must be >= zero");
 
-		import libnlopt : nlopt_add_precond_inequality_constraint;
+		import nlopt : nlopt_add_precond_inequality_constraint;
 	
 		processResult(
 			nlopt_add_precond_inequality_constraint(
@@ -1707,7 +1705,7 @@ struct Opt
 	{
 		assert(tol >= 0, "tol must be >= zero");
 
-		import libnlopt : nlopt_add_precond_inequality_constraint;
+		import nlopt : nlopt_add_precond_inequality_constraint;
 	
 		processResult(
 			nlopt_add_precond_inequality_constraint(
@@ -1744,7 +1742,7 @@ struct Opt
 			assert(t >= 0, "values of tol must be >= 0");
 		}
 
-		import libnlopt : nlopt_add_inequality_mconstraint;
+		import nlopt : nlopt_add_inequality_mconstraint;
 	
 		processResult(
 			nlopt_add_inequality_mconstraint(
@@ -1754,7 +1752,7 @@ struct Opt
 	/// ditto
 	void addInequalityMConstraint(T, U)(uint m, T fc, ref U fc_data)
 	{
-		import libnlopt : nlopt_add_inequality_mconstraint;
+		import nlopt : nlopt_add_inequality_mconstraint;
 		import std.algorithm : fill;
 		
 		auto tol = new double[m];
@@ -1768,7 +1766,7 @@ struct Opt
 	/// ditto
 	void addInequalityMConstraint(T)(uint m, T fc)
 	{
-		import libnlopt : nlopt_add_inequality_mconstraint;
+		import nlopt : nlopt_add_inequality_mconstraint;
 		import std.algorithm : fill;
 		
 		auto tol = new double[m];
@@ -1836,7 +1834,7 @@ struct Opt
 	 */
 	void removeEqualityConstraints()
 	{
-		import libnlopt : nlopt_remove_equality_constraints;
+		import nlopt : nlopt_remove_equality_constraints;
 	
 		processResult(
 			nlopt_remove_equality_constraints(_opt));
@@ -1873,7 +1871,7 @@ struct Opt
 	{
 		assert(tol >= 0, "tol must be >= zero");
 
-		import libnlopt : nlopt_add_equality_constraint;
+		import nlopt : nlopt_add_equality_constraint;
 	
 		processResult(
 			nlopt_add_equality_constraint(_opt, processFP(fc), &fc_data, tol));
@@ -1882,7 +1880,7 @@ struct Opt
 	/// ditto
 	void addEqualityConstraint(T)(T fc)
 	{
-		import libnlopt : nlopt_add_equality_constraint;
+		import nlopt : nlopt_add_equality_constraint;
 	
 		processResult(
 			nlopt_add_equality_constraint(
@@ -1946,7 +1944,7 @@ struct Opt
 	{
 		assert(tol >= 0, "tol must be >= zero");
 
-		import libnlopt : nlopt_add_precond_equality_constraint;
+		import nlopt : nlopt_add_precond_equality_constraint;
 	
 		processResult(
 			nlopt_add_precond_equality_constraint(
@@ -1955,7 +1953,7 @@ struct Opt
 	
 	void addPrecondEqualityConstraint(T, U, V...)(T fc, U pre)
 	{
-		import libnlopt : nlopt_add_precond_equality_constraint;
+		import nlopt : nlopt_add_precond_equality_constraint;
 	
 		processResult(
 			nlopt_add_precond_equality_constraint(
@@ -1992,7 +1990,7 @@ struct Opt
 			assert(t >= 0, "values of tol must be >= 0");
 		}
 
-		import libnlopt : nlopt_add_equality_mconstraint;
+		import nlopt : nlopt_add_equality_mconstraint;
 		
 		processResult(
 			nlopt_add_equality_mconstraint(
@@ -2002,7 +2000,7 @@ struct Opt
 	/// ditto
 	void addEqualityMConstraint(T, U)(uint m, T fc, ref U fc_data)
 	{
-		import libnlopt : nlopt_add_equality_mconstraint;
+		import nlopt : nlopt_add_equality_mconstraint;
 		import std.algorithm : fill;
 		
 		auto tol = new double[m];
@@ -2016,7 +2014,7 @@ struct Opt
 	/// ditto
 	void addEqualityMConstraint(T)(uint m, T fc)
 	{
-		import libnlopt : nlopt_add_equality_mconstraint;
+		import nlopt : nlopt_add_equality_mconstraint;
 		import std.algorithm : fill;
 		
 		auto tol = new double[m];
@@ -2093,7 +2091,7 @@ struct Opt
 	 */
 	void setStopval(const double stopval)
 	{
-		import libnlopt : nlopt_set_stopval;
+		import nlopt : nlopt_set_stopval;
 	
 		processResult(
 			nlopt_set_stopval(_opt, stopval));
@@ -2122,7 +2120,7 @@ struct Opt
 	 */
 	auto getStopval()
 	{
-		import libnlopt : nlopt_get_stopval;
+		import nlopt : nlopt_get_stopval;
 	
 		return nlopt_get_stopval(_opt);
 	}
@@ -2151,7 +2149,7 @@ struct Opt
 	{
 		assert(tol >= 0, "tol must be >= 0");
 
-		import libnlopt : nlopt_set_ftol_rel;
+		import nlopt : nlopt_set_ftol_rel;
 	
 		processResult(
 			nlopt_set_ftol_rel(_opt, tol));
@@ -2177,7 +2175,7 @@ struct Opt
 	 */
 	auto getFTolRel()
 	{
-		import libnlopt : nlopt_get_ftol_rel;
+		import nlopt : nlopt_get_ftol_rel;
 	
 		return nlopt_get_ftol_rel(_opt);
 	}
@@ -2206,7 +2204,7 @@ struct Opt
 	{
 		assert(tol >= 0, "tol must be >= 0");
 
-		import libnlopt : nlopt_set_ftol_abs;
+		import nlopt : nlopt_set_ftol_abs;
 	
 		processResult(
 			nlopt_set_ftol_abs(_opt, tol));
@@ -2232,7 +2230,7 @@ struct Opt
 	 */
 	auto getFTolAbs()
 	{
-		import libnlopt : nlopt_get_ftol_abs;
+		import nlopt : nlopt_get_ftol_abs;
 	
 		return nlopt_get_ftol_abs(_opt);
 	}
@@ -2261,7 +2259,7 @@ struct Opt
 	{
 		assert(tol >= 0, "tol must be >= 0");
 
-		import libnlopt : nlopt_set_xtol_rel;
+		import nlopt : nlopt_set_xtol_rel;
 		
 		processResult(
 			nlopt_set_xtol_rel(_opt, tol));
@@ -2287,7 +2285,7 @@ struct Opt
 	 */
 	auto getXTolRel()
 	{
-		import libnlopt : nlopt_get_xtol_rel;
+		import nlopt : nlopt_get_xtol_rel;
 		
 		return nlopt_get_xtol_rel(_opt);
 	}
@@ -2321,7 +2319,7 @@ struct Opt
 			assert(t >= 0, "values of tol must be >= 0");
 		}
 
-		import libnlopt : nlopt_set_xtol_abs;
+		import nlopt : nlopt_set_xtol_abs;
 		
 		processResult(
 			nlopt_set_xtol_abs(_opt, &tol[0]));
@@ -2332,7 +2330,7 @@ struct Opt
 	{
 		assert(tol >= 0, "tol must be >= 0");
 
-		import libnlopt : nlopt_set_xtol_abs1;
+		import nlopt : nlopt_set_xtol_abs1;
 	
 		processResult(
 			nlopt_set_xtol_abs1(_opt, tol));
@@ -2386,7 +2384,7 @@ struct Opt
 	{
 		assert(getDimension() == tol.length, "the length of tol must equal n");
 
-		import libnlopt : nlopt_get_xtol_abs;
+		import nlopt : nlopt_get_xtol_abs;
 		
 		processResult(
 			nlopt_get_xtol_abs(_opt, &tol[0]));
@@ -2442,7 +2440,7 @@ struct Opt
 	{
 		assert(maxeval >= 0, "maxval must be >= 0");
 
-		import libnlopt : nlopt_set_maxeval;
+		import nlopt : nlopt_set_maxeval;
 		
 		processResult(
 			nlopt_set_maxeval(_opt, maxeval));
@@ -2468,7 +2466,7 @@ struct Opt
 	 */
 	auto getMaxeval()
 	{
-		import libnlopt : nlopt_get_maxeval;
+		import nlopt : nlopt_get_maxeval;
 		
 		return nlopt_get_maxeval(_opt);
 	}
@@ -2496,7 +2494,7 @@ struct Opt
 	{
 		assert(maxtime >= 0, "maxtime must be >= 0");
 
-		import libnlopt : nlopt_set_maxtime;
+		import nlopt : nlopt_set_maxtime;
 		
 		processResult(
 			nlopt_set_maxtime(_opt, maxtime));
@@ -2522,7 +2520,7 @@ struct Opt
 	 */
 	auto getMaxtime()
 	{
-		import libnlopt : nlopt_get_maxtime;
+		import nlopt : nlopt_get_maxtime;
 		
 		return nlopt_get_maxtime(_opt);
 	}
@@ -2546,7 +2544,7 @@ struct Opt
 	 */
 	void forceStop()
 	{
-		import libnlopt : nlopt_force_stop;
+		import nlopt : nlopt_force_stop;
 		
 		processResult(
 			nlopt_force_stop(_opt));
@@ -2569,7 +2567,7 @@ struct Opt
 	{
 		assert(val >= 0, "val must be >= 0");
 
-		import libnlopt : nlopt_set_force_stop;
+		import nlopt : nlopt_set_force_stop;
 		
 		processResult(
 			nlopt_set_force_stop(_opt, val));
@@ -2588,7 +2586,7 @@ struct Opt
 	 */
 	auto getForceStop()
 	{
-		import libnlopt : nlopt_get_force_stop;
+		import nlopt : nlopt_get_force_stop;
 		
 		return nlopt_get_force_stop(_opt);
 	}
@@ -2611,7 +2609,7 @@ struct Opt
 	 */
 	void setLocalOptimizer(nlopt_opt local_opt)
 	{
-		import libnlopt : nlopt_set_local_optimizer;
+		import nlopt : nlopt_set_local_optimizer;
 		
 		processResult(
 			nlopt_set_local_optimizer(_opt, local_opt));
@@ -2620,7 +2618,7 @@ struct Opt
 	/// ditto
 	void setLocalOptimizer(Opt local_opt)
 	{
-		import libnlopt : nlopt_set_local_optimizer;
+		import nlopt : nlopt_set_local_optimizer;
 		
 		nlopt_set_local_optimizer(_opt, local_opt.getOptRaw());
 	}
@@ -2660,7 +2658,7 @@ struct Opt
 	 */
 	void setPopulation(const uint pop)
 	{
-		import libnlopt : nlopt_set_population;
+		import nlopt : nlopt_set_population;
 		
 		processResult(
 			nlopt_set_population(_opt, pop));
@@ -2685,7 +2683,7 @@ struct Opt
 	 */
 	auto getPopulation()
 	{
-		import libnlopt : nlopt_get_population;
+		import nlopt : nlopt_get_population;
 		
 		return nlopt_get_population(_opt);
 	}
@@ -2712,7 +2710,7 @@ struct Opt
 	 */
 	void setVectorStorage(const uint M)
 	{
-		import libnlopt : nlopt_set_vector_storage;
+		import nlopt : nlopt_set_vector_storage;
 		
 		processResult(
 			nlopt_set_vector_storage(_opt, M));
@@ -2737,7 +2735,7 @@ struct Opt
 	 */
 	auto getVectorStorage()
 	{
-		import libnlopt : nlopt_get_vector_storage;
+		import nlopt : nlopt_get_vector_storage;
 		
 		return nlopt_get_vector_storage(_opt);
 	}
@@ -2769,7 +2767,7 @@ struct Opt
 	{
 		assert(getDimension() == dx.length, "the length of dx must equal n");
 
-		import libnlopt : nlopt_set_default_initial_step;
+		import nlopt : nlopt_set_default_initial_step;
 		
 		processResult(
 			nlopt_set_default_initial_step(_opt, &dx[0]));
@@ -2780,7 +2778,7 @@ struct Opt
 	{
 		assert(getDimension() == 1, "the length of dx must equal n");
 
-		import libnlopt : nlopt_set_default_initial_step;
+		import nlopt : nlopt_set_default_initial_step;
 		
 		processResult(
 			nlopt_set_default_initial_step(_opt, &dx));
@@ -2850,7 +2848,7 @@ struct Opt
 	{
 		assert(getDimension() == dx.length, "the length of dx must equal n");
 
-		import libnlopt : nlopt_set_initial_step;
+		import nlopt : nlopt_set_initial_step;
 		
 		processResult(
 			nlopt_set_initial_step(_opt, &dx[0]));
@@ -2861,7 +2859,7 @@ struct Opt
 	{
 		assert(dx >= 0, "the value of dx must be >= 0");
 
-		import libnlopt : nlopt_set_initial_step1;
+		import nlopt : nlopt_set_initial_step1;
 		
 		processResult(
 			nlopt_set_initial_step1(_opt, dx));
@@ -2944,7 +2942,7 @@ struct Opt
 		assert(x.length == dx.length, 
 			"the length of x must equal the length of dx");
 
-		import libnlopt : nlopt_get_initial_step;
+		import nlopt : nlopt_get_initial_step;
 		
 		processResult(
 			nlopt_get_initial_step(_opt, &x[0], &dx[0]));
@@ -2955,7 +2953,7 @@ struct Opt
 	{
 		assert(getDimension() == 1, "the length of dx must equal n");
 
-		import libnlopt : nlopt_get_initial_step;
+		import nlopt : nlopt_get_initial_step;
 		
 		processResult(
 			nlopt_get_initial_step(_opt, &x, &dx));
