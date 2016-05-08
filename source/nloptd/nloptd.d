@@ -15,7 +15,7 @@
 
 module nloptd;
 
-import nlopt : nlopt_algorithm, nlopt_result;
+import nlopt;
 
 
 private
