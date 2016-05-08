@@ -216,14 +216,14 @@ enum Algorithm
     gnDirectLRand				= nlopt_algorithm.NLOPT_GN_DIRECT_L_RAND,
     gnDirectNoScal				= nlopt_algorithm.NLOPT_GN_DIRECT_NOSCAL,
     gnDirectLNoScal				= nlopt_algorithm.NLOPT_GN_DIRECT_L_NOSCAL,
-    gnDirectLRandNoscal			= nlopt_algorithm.NLOPT_GN_DIRECT_L_RAND_NOSCAL,
+    gnDirectLRandNoScal			= nlopt_algorithm.NLOPT_GN_DIRECT_L_RAND_NOSCAL,
     gnOrigDirect				= nlopt_algorithm.NLOPT_GN_ORIG_DIRECT,
     gnOrigDirectL				= nlopt_algorithm.NLOPT_GN_ORIG_DIRECT_L,
 
 	gdStoGo						= nlopt_algorithm.NLOPT_GD_STOGO,
 	gdStoGoRand					= nlopt_algorithm.NLOPT_GD_STOGO_RAND,
 
-    ldLBFGSNoCedal				= nlopt_algorithm.NLOPT_LD_LBFGS_NOCEDAL,
+    ldLBFGSNocedal				= nlopt_algorithm.NLOPT_LD_LBFGS_NOCEDAL,
     ldLBFGS						= nlopt_algorithm.NLOPT_LD_LBFGS,
 
 	lnPraxis					= nlopt_algorithm.NLOPT_LN_PRAXIS,
@@ -853,7 +853,7 @@ struct Opt
 	
 	unittest
 	{
-		auto opt = Opt(Algorithm.gnDirectLRandNoscal, 2);
+		auto opt = Opt(Algorithm.gnDirectLRandNoScal, 2);
 		assert(opt.getAlgorithmRaw == NLOPT_GN_DIRECT_L_RAND_NOSCAL);
 	}
 	
@@ -883,7 +883,7 @@ struct Opt
 	
 	unittest
 	{
-		auto opt = Opt(Algorithm.ldLBFGSNoCedal, 2);
+		auto opt = Opt(Algorithm.ldLBFGSNocedal, 2);
 		assert(opt.getAlgorithmRaw == NLOPT_LD_LBFGS_NOCEDAL);
 	}
 	
