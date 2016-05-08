@@ -216,7 +216,7 @@ enum Algorithm
     gnDirectLRand				= NLOPT_GN_DIRECT_L_RAND,
     gnDirectNoScal				= NLOPT_GN_DIRECT_NOSCAL,
     gnDirectLNoScal				= NLOPT_GN_DIRECT_L_NOSCAL,
-    gnDirectLRandNoScal			= NLOPT_GN_DIRECT_L_RAND_NOSCAL,
+    gnDirectLRandNoscal			= NLOPT_GN_DIRECT_L_RAND_NOSCAL,
     gnOrigDirect				= NLOPT_GN_ORIG_DIRECT,
     gnOrigDirectL				= NLOPT_GN_ORIG_DIRECT_L,
 
@@ -853,7 +853,7 @@ struct Opt
 	
 	unittest
 	{
-		auto opt = Opt(Algorithm.gnDirectLRandNoScal, 2);
+		auto opt = Opt(Algorithm.gnDirectLRandNoscal, 2);
 		assert(opt.getAlgorithmRaw == NLOPT_GN_DIRECT_L_RAND_NOSCAL);
 	}
 	
