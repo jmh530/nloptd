@@ -211,69 +211,69 @@ private
  */
 enum Algorithm
 {
-    gnDirect					= NLOPT_GN_DIRECT,
-    gnDirectL					= NLOPT_GN_DIRECT_L,
-    gnDirectLRand				= NLOPT_GN_DIRECT_L_RAND,
-    gnDirectNoScal				= NLOPT_GN_DIRECT_NOSCAL,
-    gnDirectLNoScal				= NLOPT_GN_DIRECT_L_NOSCAL,
-    gnDirectLRandNoscal			= NLOPT_GN_DIRECT_L_RAND_NOSCAL,
-    gnOrigDirect				= NLOPT_GN_ORIG_DIRECT,
-    gnOrigDirectL				= NLOPT_GN_ORIG_DIRECT_L,
+    gnDirect					= nlopt_algorithm.NLOPT_GN_DIRECT,
+    gnDirectL					= nlopt_algorithm.NLOPT_GN_DIRECT_L,
+    gnDirectLRand				= nlopt_algorithm.NLOPT_GN_DIRECT_L_RAND,
+    gnDirectNoScal				= nlopt_algorithm.NLOPT_GN_DIRECT_NOSCAL,
+    gnDirectLNoScal				= nlopt_algorithm.NLOPT_GN_DIRECT_L_NOSCAL,
+    gnDirectLRandNoscal			= nlopt_algorithm.NLOPT_GN_DIRECT_L_RAND_NOSCAL,
+    gnOrigDirect				= nlopt_algorithm.NLOPT_GN_ORIG_DIRECT,
+    gnOrigDirectL				= nlopt_algorithm.NLOPT_GN_ORIG_DIRECT_L,
 
-	gdStoGo						= NLOPT_GD_STOGO,
-	gdStoGoRand					= NLOPT_GD_STOGO_RAND,
+	gdStoGo						= nlopt_algorithm.NLOPT_GD_STOGO,
+	gdStoGoRand					= nlopt_algorithm.NLOPT_GD_STOGO_RAND,
 
-    ldLBFGSNoCedal				= NLOPT_LD_LBFGS_NOCEDAL,
-    ldLBFGS						= NLOPT_LD_LBFGS,
+    ldLBFGSNoCedal				= nlopt_algorithm.NLOPT_LD_LBFGS_NOCEDAL,
+    ldLBFGS						= nlopt_algorithm.NLOPT_LD_LBFGS,
 
-	lnPraxis					= NLOPT_LN_PRAXIS,
+	lnPraxis					= nlopt_algorithm.NLOPT_LN_PRAXIS,
 
-    ldVar1						= NLOPT_LD_VAR1,
-    ldVar2						= NLOPT_LD_VAR2,
+    ldVar1						= nlopt_algorithm.NLOPT_LD_VAR1,
+    ldVar2						= nlopt_algorithm.NLOPT_LD_VAR2,
 
-    ldTNewton					= NLOPT_LD_TNEWTON,
-    ldTNewtonRestart			= NLOPT_LD_TNEWTON_RESTART,
-    ldTNewtonPrecond			= NLOPT_LD_TNEWTON_PRECOND,
-    ldTNewtonPrecondRestart		= NLOPT_LD_TNEWTON_PRECOND_RESTART,
+    ldTNewton					= nlopt_algorithm.NLOPT_LD_TNEWTON,
+    ldTNewtonRestart			= nlopt_algorithm.NLOPT_LD_TNEWTON_RESTART,
+    ldTNewtonPrecond			= nlopt_algorithm.NLOPT_LD_TNEWTON_PRECOND,
+    ldTNewtonPrecondRestart		= nlopt_algorithm.NLOPT_LD_TNEWTON_PRECOND_RESTART,
 
-	gnCRS2LM					= NLOPT_GN_CRS2_LM,
-	gnMlsl						= NLOPT_GN_MLSL,
-	gdMlsl						= NLOPT_GD_MLSL,
-	gnMlslLDS					= NLOPT_GN_MLSL_LDS,
-	gdMlslLDS					= NLOPT_GD_MLSL_LDS,
+	gnCRS2LM					= nlopt_algorithm.NLOPT_GN_CRS2_LM,
+	gnMlsl						= nlopt_algorithm.NLOPT_GN_MLSL,
+	gdMlsl						= nlopt_algorithm.NLOPT_GD_MLSL,
+	gnMlslLDS					= nlopt_algorithm.NLOPT_GN_MLSL_LDS,
+	gdMlslLDS					= nlopt_algorithm.NLOPT_GD_MLSL_LDS,
 
-    ldMMA						= NLOPT_LD_MMA,
+    ldMMA						= nlopt_algorithm.NLOPT_LD_MMA,
 
-	lnCOBYLA					= NLOPT_LN_COBYLA,
-	lnNewuoa					= NLOPT_LN_NEWUOA,
-	lnNewuoaBound				= NLOPT_LN_NEWUOA_BOUND,
-	lnNelderMead				= NLOPT_LN_NELDERMEAD,
-	lnSBPLX						= NLOPT_LN_SBPLX,
+	lnCOBYLA					= nlopt_algorithm.NLOPT_LN_COBYLA,
+	lnNewuoa					= nlopt_algorithm.NLOPT_LN_NEWUOA,
+	lnNewuoaBound				= nlopt_algorithm.NLOPT_LN_NEWUOA_BOUND,
+	lnNelderMead				= nlopt_algorithm.NLOPT_LN_NELDERMEAD,
+	lnSBPLX						= nlopt_algorithm.NLOPT_LN_SBPLX,
 
  /* new variants that require local_optimizer to be set,
 not with older constants for backwards compatibility */
 
-	lnAuglag					= NLOPT_LN_AUGLAG,
-	lnAuglagEQ					= NLOPT_LN_AUGLAG_EQ,
-    ldAuglag					= NLOPT_LD_AUGLAG,
-	ldAuglagEQ					= NLOPT_LD_AUGLAG_EQ,
+	lnAuglag					= nlopt_algorithm.NLOPT_LN_AUGLAG,
+	lnAuglagEQ					= nlopt_algorithm.NLOPT_LN_AUGLAG_EQ,
+    ldAuglag					= nlopt_algorithm.NLOPT_LD_AUGLAG,
+	ldAuglagEQ					= nlopt_algorithm.NLOPT_LD_AUGLAG_EQ,
 	
-	lnBOBYQA					= NLOPT_LN_BOBYQA,
-	gnISRES						= NLOPT_GN_ISRES,
+	lnBOBYQA					= nlopt_algorithm.NLOPT_LN_BOBYQA,
+	gnISRES						= nlopt_algorithm.NLOPT_GN_ISRES,
 
-	auglag						= NLOPT_AUGLAG,
-    auglag_eq					= NLOPT_AUGLAG_EQ,
+	auglag						= nlopt_algorithm.NLOPT_AUGLAG,
+    auglag_eq					= nlopt_algorithm.NLOPT_AUGLAG_EQ,
 	
-	gMlsl						= NLOPT_G_MLSL,
-    gMlslLQS					= NLOPT_G_MLSL_LDS,
+	gMlsl						= nlopt_algorithm.NLOPT_G_MLSL,
+    gMlslLQS					= nlopt_algorithm.NLOPT_G_MLSL_LDS,
 
-	ldSLSQP						= NLOPT_LD_SLSQP,
+	ldSLSQP						= nlopt_algorithm.NLOPT_LD_SLSQP,
 
-	ldCCSAQ						= NLOPT_LD_CCSAQ,
+	ldCCSAQ						= nlopt_algorithm.NLOPT_LD_CCSAQ,
 
-	gnESCH						= NLOPT_GN_ESCH,
+	gnESCH						= nlopt_algorithm.NLOPT_GN_ESCH,
 	
-    numAlgorithms				= NLOPT_NUM_ALGORITHMS,
+    numAlgorithms				= nlopt_algorithm.NLOPT_NUM_ALGORITHMS,
     	//not an algorithm, just the number of them
 }
 
@@ -284,18 +284,18 @@ not with older constants for backwards compatibility */
  */
 enum Result
 {
-    failure				= NLOPT_FAILURE,
-    invalidArgs			= NLOPT_INVALID_ARGS,
-    outOfMemory			= NLOPT_OUT_OF_MEMORY,
-    roundoffLimited		= NLOPT_ROUNDOFF_LIMITED,
-    forcedStop			= NLOPT_FORCED_STOP,
+    failure				= nlopt_result.NLOPT_FAILURE,
+    invalidArgs			= nlopt_result.NLOPT_INVALID_ARGS,
+    outOfMemory			= nlopt_result.NLOPT_OUT_OF_MEMORY,
+    roundoffLimited		= nlopt_result.NLOPT_ROUNDOFF_LIMITED,
+    forcedStop			= nlopt_result.NLOPT_FORCED_STOP,
 	
-    success				= NLOPT_SUCCESS,
-    stopvalReached		= NLOPT_STOPVAL_REACHED,
-    ftolReached			= NLOPT_FTOL_REACHED,
-    xtolReached			= NLOPT_XTOL_REACHED,
-    maxevalReached		= NLOPT_MAXEVAL_REACHED,
-    maxtimeReached		= NLOPT_MAXTIME_REACHED,
+    success				= nlopt_result.NLOPT_SUCCESS,
+    stopvalReached		= nlopt_result.NLOPT_STOPVAL_REACHED,
+    ftolReached			= nlopt_result.NLOPT_FTOL_REACHED,
+    xtolReached			= nlopt_result.NLOPT_XTOL_REACHED,
+    maxevalReached		= nlopt_result.NLOPT_MAXEVAL_REACHED,
+    maxtimeReached		= nlopt_result.NLOPT_MAXTIME_REACHED,
 }
 
 /**************************************
