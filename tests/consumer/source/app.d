@@ -141,8 +141,65 @@ private void testConstraintException()
     assert(abs(point[0] - 1) < 1e-6 && abs(result.value - 1) < 1e-6);
 }
 
+private void planes(scope double[] residuals, scope const(double)[] x, scope double[] gradient)
+{
+    assert(residuals.length == 2 && x.length == 3);
+    residuals[0] = x[0] + 2 * x[1] - 3;
+    residuals[1] = -x[1] + 3 * x[2] - 8;
+    if (gradient.length)
+        gradient[] = [1.0, 2, 0, 0, -1, 3];
+}
+
+private void testVectorEquality()
+{
+    auto opt = Optimizer(Algorithm.ldSLSQP, 3);
+    opt.setMinObjective((x, gradient) {
+        if (gradient.length) gradient[] = 2 * x[];
+        return x[0] * x[0] + x[1] * x[1] + x[2] * x[2];
+    });
+    opt.addEqualityMConstraint(&planes, null);
+    assertThrown(opt.addEqualityMConstraint(&planes, [0.0, double.nan]));
+    opt.addEqualityMConstraint(&planes, [1e-9, 1e-8]);
+    opt.setXTolRel(1e-9);
+    opt.setMaxEvaluations(200);
+    double[3] point = [0, 0, 0];
+    auto result = opt.optimizeInPlace(point[]);
+    // The closest feasible point to the origin is the sum of the two plane normals.
+    assert(abs(point[0] - 1) < 1e-6 && abs(point[1] - 1) < 1e-6 && abs(point[2] - 3) < 1e-6);
+    assert(abs(result.value - 11) < 1e-6);
+}
+
+private void testVectorInequality()
+{
+    import nloptd.raw : NLOPT_LN_COBYLA;
+
+    auto initial = Optimizer(NLOPT_LN_COBYLA, 1);
+    initial.setMinObjective(&sphere);
+    auto marker = new Exception("vector constraint failure");
+    bool fail = true;
+    initial.addInequalityMConstraint((residuals, x, gradient) {
+        assert(gradient.length == 0 && residuals.length == 2);
+        residuals[0] = 1 - x[0];
+        if (fail) throw marker;
+        residuals[1] = x[0] - 3;
+    }, [1e-8, 1e-8]);
+    initial.setMaxEvaluations(200);
+    initial.setXTolRel(1e-8);
+    auto opt = move(initial);
+    GC.collect();
+    double[1] point = [2];
+    try { opt.optimizeInPlace(point[]); assert(0); }
+    catch (Exception error) { assert(error is marker); }
+    fail = false;
+    point[0] = 2;
+    auto result = opt.optimizeInPlace(point[]);
+    assert(abs(point[0] - 1) < 1e-6 && abs(result.value - 1) < 1e-6);
+}
+
 void main()
 {
+    testVectorEquality();
+    testVectorInequality();
     testBounds();
     testMmaTutorial();
     testEquality();

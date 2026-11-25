@@ -1,4 +1,4 @@
-/// Optimizer ownership, scalar objectives and constraints, and termination results.
+/// Optimizer ownership, scalar objectives, nonlinear constraints and termination results.
 module nloptd.optimizer;
 
 private import c = nloptd.raw;
@@ -41,6 +41,19 @@ struct OptimizationResult
 /// Receives the borrowed point and optional writable gradient for one evaluation.
 /// Fill the whole gradient when nonempty and return the objective or constraint value.
 alias Objective = double delegate(scope const(double)[] x, scope double[] gradient);
+
+/** Evaluate multiple constraint residuals at one point. All slices borrow native
+    storage for this call.
+    Params:
+        residuals = Write all m constraint values, in tolerance order.
+        x = The n coordinates of the evaluation point.
+        gradient = Empty when derivatives are unnecessary. Otherwise write all m*n
+            entries, with the derivative of residual i in coordinate j at i*n+j.
+*/
+alias VectorConstraint = void delegate(scope double[] residuals, scope const(double)[] x, scope double[] gradient);
+
+/// Function pointer with the same contract as $(D VectorConstraint).
+alias VectorConstraintFunction = void function(scope double[] residuals, scope const(double)[] x, scope double[] gradient);
 
 /// Failure reported by a native operation.
 class NloptException : Exception
@@ -94,12 +107,15 @@ private struct NativeOwner
 }
 
 // Each native callback borrows a stable record retained by the solve state.
-private struct ScalarCallback
+private struct Callback(F)
 {
     State* state;
-    Objective callable;
-    ScalarCallback* nextConstraint;
+    F callable;
+    Callback* nextConstraint;
 }
+
+private alias ScalarCallback = Callback!Objective;
+private alias VectorCallback = Callback!VectorConstraint;
 
 private struct State
 {
@@ -107,6 +123,7 @@ private struct State
     c.nlopt_opt handle;
     ScalarCallback objective;
     ScalarCallback* constraints;
+    VectorCallback* vectorConstraints;
     Throwable pending;
     bool running;
 
@@ -134,6 +151,30 @@ private extern(C) double evaluate(uint n, const(double)* x, double* gradient, vo
         }
     }
     return double.infinity;
+}
+
+private extern(C) void evaluateVector(uint m, double* residuals, uint n, const(double)* x,
+                                      double* gradient, void* data)
+{
+    auto callback = cast(VectorCallback*) data;
+    auto state = callback.state;
+    auto values = residuals[0 .. m];
+    auto derivatives = gradient ? gradient[0 .. cast(size_t) m * n] : null;
+    if (!state.pending)
+    {
+        try
+        {
+            callback.callable(values, x[0 .. n], derivatives);
+            return;
+        }
+        catch (Throwable error)
+        {
+            state.pending = error;
+            c.nlopt_force_stop(state.handle);
+        }
+    }
+    values[] = double.infinity;
+    derivatives[] = 0;
 }
 
 /// Move-only owner. Confine an active optimizer and its callbacks to one thread.
@@ -335,6 +376,77 @@ struct Optimizer
         import std.functional : toDelegate;
         enforce(constraint !is null, "Missing constraint");
         addEqualityConstraint(toDelegate(constraint), tolerance);
+    }
+
+    private void addVectorConstraint(alias register)(VectorConstraint constraint, scope const(double)[] tolerances)
+    {
+        auto s = idle();
+        enforce(constraint !is null, "Missing constraint");
+        if (!tolerances.length) return;
+        enforce(tolerances.length <= uint.max, "Too many constraint residuals");
+        enforce(tolerances.length <= size_t.max / double.sizeof / c.nlopt_get_dimension(s.handle),
+                "Constraint gradient is too large");
+        foreach (tolerance; tolerances)
+            enforce(tolerance >= 0, "Constraint tolerance must be nonnegative");
+        auto callback = new VectorCallback(s, constraint, s.vectorConstraints);
+        s.check(register(s.handle, cast(uint) tolerances.length, &evaluateVector, callback, tolerances.ptr));
+        s.vectorConstraints = callback;
+    }
+
+    /** Register a vector of inequality constraints, one per tolerance.
+        Params:
+            constraint = Retained callback. Write each residual (nonpositive when feasible)
+                and its derivatives when requested, as described by $(D VectorConstraint).
+            tolerances = Nonnegative absolute feasibility tolerances copied by NLopt.
+                An empty slice registers no constraints.
+        Throws: Exception for a missing callback, invalid size or tolerance, inactive
+            owner, active solve or native registration failure.
+    */
+    void addInequalityMConstraint(VectorConstraint constraint, scope const(double)[] tolerances)
+    {
+        addVectorConstraint!(c.nlopt_add_inequality_mconstraint)(constraint, tolerances);
+    }
+
+    /** Register vector inequality constraints using a D function.
+        Params:
+            constraint = Function with the same borrowed slices as $(D VectorConstraint).
+            tolerances = One nonnegative feasibility tolerance per residual.
+                An empty slice registers no constraints.
+        Throws: Exception under the same conditions as the delegate overload.
+    */
+    void addInequalityMConstraint(VectorConstraintFunction constraint, scope const(double)[] tolerances)
+    {
+        import std.functional : toDelegate;
+        enforce(constraint !is null, "Missing constraint");
+        addInequalityMConstraint(toDelegate(constraint), tolerances);
+    }
+
+    /** Register a vector of equality constraints, one per tolerance.
+        Params:
+            constraint = Retained callback. Write each residual (zero when feasible)
+                and its derivatives when requested, as described by $(D VectorConstraint).
+            tolerances = Nonnegative absolute feasibility tolerances copied by NLopt.
+                An empty slice registers no constraints.
+        Throws: Exception for a missing callback, invalid size or tolerance, inactive
+            owner, active solve or native registration failure.
+    */
+    void addEqualityMConstraint(VectorConstraint constraint, scope const(double)[] tolerances)
+    {
+        addVectorConstraint!(c.nlopt_add_equality_mconstraint)(constraint, tolerances);
+    }
+
+    /** Register vector equality constraints using a D function.
+        Params:
+            constraint = Function with the same borrowed slices as $(D VectorConstraint).
+            tolerances = One nonnegative feasibility tolerance per residual.
+                An empty slice registers no constraints.
+        Throws: Exception under the same conditions as the delegate overload.
+    */
+    void addEqualityMConstraint(VectorConstraintFunction constraint, scope const(double)[] tolerances)
+    {
+        import std.functional : toDelegate;
+        enforce(constraint !is null, "Missing constraint");
+        addEqualityMConstraint(toDelegate(constraint), tolerances);
     }
 
     /** Set the relative tolerance on changes in coordinates.
