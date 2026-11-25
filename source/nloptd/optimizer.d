@@ -53,15 +53,54 @@ class NloptException : Exception
     }
 }
 
+// The optimizer and each active solve own one reference apiece. A GC
+// finalizer can release the owner's reference on another thread.
+private struct NativeOwner
+{
+    c.nlopt_opt handle;
+    shared uint references;
+
+    static NativeOwner* create(c.nlopt_algorithm algorithm, uint dimension)
+    {
+        import core.exception : onOutOfMemoryError;
+        import core.stdc.stdlib : free, malloc;
+
+        auto owner = cast(NativeOwner*) malloc(NativeOwner.sizeof);
+        if (!owner) onOutOfMemoryError();
+        scope(failure) free(owner);
+        owner.handle = c.nlopt_create(algorithm, dimension);
+        enforce(owner.handle, "nlopt_create failed");
+        owner.references = 1;
+        return owner;
+    }
+
+    void retain()
+    {
+        import core.atomic : atomicOp;
+        atomicOp!"+="(references, 1u);
+    }
+
+    void release()
+    {
+        import core.atomic : atomicOp;
+        import core.stdc.stdlib : free;
+        if (atomicOp!"-="(references, 1u) == 0)
+        {
+            c.nlopt_destroy(handle);
+            free(&this);
+        }
+    }
+}
+
 // C borrows this record. The owner and an active solve retain it across GC
 // collections. Moving the owner preserves the address registered with C.
 private struct State
 {
+    // Borrowed from NativeOwner for configuration and callback dispatch.
     c.nlopt_opt handle;
     Objective objective;
     Throwable pending;
     bool running;
-    bool destroyAfterRun;
 
     void check(c.nlopt_result code)
     {
@@ -92,6 +131,7 @@ private extern(C) double evaluate(uint n, const(double)* x, double* gradient, vo
 /// A default-initialized or moved-from optimizer is inert.
 struct Optimizer
 {
+    private NativeOwner* owner;
     private State* state;
     @disable this(this);
 
@@ -116,17 +156,34 @@ struct Optimizer
     {
         enforce(dimension > 0, "NLopt requires a positive dimension");
         state = new State;
-        state.handle = c.nlopt_create(algorithm, dimension);
-        enforce(state.handle, "nlopt_create failed");
+        owner = NativeOwner.create(algorithm, dimension);
+        state.handle = owner.handle;
     }
 
     ~this()
     {
-        if (!state) return;
-        if (state.running)
-            state.destroyAfterRun = true;
-        else
-            c.nlopt_destroy(state.handle);
+        if (owner) owner.release();
+    }
+
+    unittest
+    {
+        import core.memory : GC;
+        static class Holder
+        {
+            Optimizer opt;
+            static bool finalized;
+            ~this() { finalized = GC.inFinalizer; }
+        }
+
+        auto holder = new Holder;
+        holder.opt = Optimizer(Algorithm.lnNelderMead, 1);
+        c.nlopt_set_munge(holder.opt.owner.handle, &countDestruction, null);
+        auto before = destructions;
+        // Run the enclosing class's GC finalizer without relying on stack
+        // scanning to decide when the test's last reference disappears.
+        GC.runFinalizers((cast(const void*) typeid(Holder).destructor)[0 .. 1]);
+        assert(Holder.finalized);
+        assert(destructions == before + 1);
     }
 
     private State* idle()
@@ -206,12 +263,14 @@ struct Optimizer
         auto s = idle();
         enforce(s.objective !is null, "Missing objective");
         enforce(point.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
+        auto activeOwner = owner;
+        activeOwner.retain();
+        scope(exit) activeOwner.release();
         s.running = true;
         scope(exit)
         {
             s.running = false;
             s.pending = null;
-            if (s.destroyAfterRun) c.nlopt_destroy(s.handle);
         }
         double value;
         auto code = c.nlopt_optimize(s.handle, point.ptr, &value);
@@ -237,5 +296,34 @@ struct Optimizer
         auto result = opt.optimizeInPlace(point[]);
         assert(abs(point[0] - target) < 1e-6);
         assert(result.value < 1e-10);
+    }
+
+    unittest
+    {
+        auto opt = Optimizer(Algorithm.lnNelderMead, 1);
+        auto error = new Exception("owner destroyed during evaluation");
+        auto before = destructions;
+        opt.setMinObjective((x, gradient) {
+            destroy(opt);
+            assert(destructions == before);
+            throw error;
+            return 0.0;
+        });
+        c.nlopt_set_munge(opt.owner.handle, &countDestruction, null);
+        double[1] point = [1];
+        try { opt.optimizeInPlace(point[]); assert(0); }
+        catch (Exception caught) { assert(caught is error); }
+        assert(destructions == before + 1);
+    }
+}
+
+version (unittest)
+{
+    private uint destructions;
+    // NLopt invokes this hook on the objective data when freeing the handle.
+    private extern(C) void* countDestruction(void*)
+    {
+        ++destructions;
+        return null;
     }
 }

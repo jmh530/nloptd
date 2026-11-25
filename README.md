@@ -67,6 +67,8 @@ auto result = opt.optimizeInPlace(point[]);
 
 The callback borrows both slices for one invocation. An empty gradient means NLopt requests only the value. The registration retains the delegate between runs. Exceptions stop the native solve and propagate back to the caller as the original D throwable. Call `forceStop()` from a callback to request an ordinary interrupted result. Interpret partial results using the termination reason.
 
+A local optimizer releases its native handle at scope exit. If the owner is destroyed during an evaluation, the active solve retains the handle until it finishes handling the result or callback exception. For a GC-managed class with an `Optimizer` field, prefer explicit destruction when the resource is no longer needed. If relying on GC finalization, declare a class destructor (an empty `~this() {}` suffices). With DMD 2.114.0, the field destructor alone did not mark the enclosing class allocation for finalization.
+
 ## Migrating from 0.2.1
 
 Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Bounds, nonlinear constraints and subsidiary optimizer configuration are available through the raw C API while the high-level port is in progress. The DUB package no longer depends on libnlopt.
