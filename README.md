@@ -70,9 +70,31 @@ The callback borrows both slices for one invocation. An empty gradient means NLo
 
 A local optimizer releases its native handle at scope exit. If the owner is destroyed during an evaluation, the active solve retains the handle until it finishes handling the result or callback exception. For a GC-managed class with an `Optimizer` field, prefer explicit destruction when the resource is no longer needed. If relying on GC finalization, declare a class destructor (an empty `~this() {}` suffices). With DMD 2.114.0, the field destructor alone did not mark the enclosing class allocation for finalization.
 
+## Scalar nonlinear constraints
+
+Use `addInequalityConstraint` for `c(x) ≤ 0` and `addEqualityConstraint` for `h(x) = 0`. Each call registers another constraint. The optional second argument is the absolute tolerance NLopt uses to judge feasibility when stopping. It defaults to zero. Select an algorithm that supports the constraints you need, such as SLSQP for equalities or MMA for inequalities.
+
+For example, this SLSQP constraint requires the point to lie on the unit circle in two dimensions.
+
+```d
+import nloptd;
+
+auto opt = Optimizer(Algorithm.ldSLSQP, 2);
+opt.addEqualityConstraint((x, gradient) {
+    if (gradient.length)
+    {
+        gradient[0] = 2 * x[0];
+        gradient[1] = 2 * x[1];
+    }
+    return x[0] * x[0] + x[1] * x[1] - 1;
+}, 1e-8);
+```
+
+Constraints follow the objective's slice lifetime and exception rules. Each registration retains its own callback across solves. The [consumer test](tests/consumer/source/app.d) includes the NLopt MMA tutorial with two separately captured cubic inequalities.
+
 ## Migrating from 0.2.1
 
-Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Pass a scalar or one value per coordinate to `setLowerBounds` and `setUpperBounds`. Use the raw C API for nonlinear constraints and subsidiary optimizer configuration. The DUB package no longer depends on libnlopt.
+Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Pass a scalar or one value per coordinate to `setLowerBounds` and `setUpperBounds`. Use the raw C API for vector-valued constraints and subsidiary optimizer configuration. The DUB package no longer depends on libnlopt.
 
 ## License
 
