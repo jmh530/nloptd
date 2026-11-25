@@ -60,9 +60,93 @@ private void testBounds()
     assert(abs(result.value - 2) < 1e-6);
 }
 
+private Objective cubicConstraint(double a, double b)
+{
+    return (x, gradient) {
+        const t = a * x[0] + b;
+        if (gradient.length)
+        {
+            gradient[0] = 3 * a * t * t;
+            gradient[1] = -1;
+        }
+        return t * t * t - x[1];
+    };
+}
+
+private void testMmaTutorial()
+{
+    import std.math : sqrt;
+
+    auto initial = Optimizer(Algorithm.ldMMA, 2);
+    initial.setMinObjective((x, gradient) {
+        const value = sqrt(x[1]);
+        if (gradient.length)
+        {
+            gradient[0] = 0;
+            gradient[1] = 0.5 / value;
+        }
+        return value;
+    });
+    initial.setLowerBounds([-double.infinity, 1e-6]);
+    initial.addInequalityConstraint(cubicConstraint(2, 0), 1e-8);
+    initial.addInequalityConstraint(cubicConstraint(-1, 1), 1e-8);
+    initial.setXTolRel(1e-6);
+    initial.setMaxEvaluations(500);
+    auto opt = move(initial);
+    GC.collect();
+    double[2] point = [1.234, 5.678];
+    auto result = opt.optimizeInPlace(point[]);
+    assert(abs(point[0] - 1.0 / 3) < 1e-4);
+    assert(abs(point[1] - 8.0 / 27) < 1e-4);
+    assert(abs(result.value - sqrt(8.0 / 27)) < 1e-4);
+}
+
+private double unitEquality(scope const(double)[] x, scope double[] gradient)
+{
+    if (gradient.length) gradient[0] = 2 * x[0];
+    return x[0] * x[0] - 1;
+}
+
+private void testEquality()
+{
+    auto opt = quadratic(0.5);
+    assertThrown(opt.addEqualityConstraint(&unitEquality, -1));
+    opt.addEqualityConstraint(&unitEquality, 1e-8);
+    double[1] point = [1.5];
+    auto result = opt.optimizeInPlace(point[]);
+    assert(abs(point[0] - 1) < 1e-6 && abs(result.value - 0.25) < 1e-6);
+}
+
+private void testConstraintException()
+{
+    import nloptd.raw : NLOPT_LN_COBYLA;
+
+    auto opt = Optimizer(NLOPT_LN_COBYLA, 1);
+    opt.setMinObjective(&sphere);
+    auto marker = new Exception("constraint failure");
+    bool fail = true;
+    opt.addInequalityConstraint((x, gradient) {
+        assert(gradient.length == 0);
+        if (fail) throw marker;
+        return 1 - x[0];
+    });
+    opt.setXTolRel(1e-8);
+    opt.setMaxEvaluations(200);
+    double[1] point = [2];
+    try { opt.optimizeInPlace(point[]); assert(0); }
+    catch (Exception error) { assert(error is marker); }
+    fail = false;
+    point[0] = 2;
+    auto result = opt.optimizeInPlace(point[]);
+    assert(abs(point[0] - 1) < 1e-6 && abs(result.value - 1) < 1e-6);
+}
+
 void main()
 {
     testBounds();
+    testMmaTutorial();
+    testEquality();
+    testConstraintException();
     int major, minor, patch;
     nlopt_version(&major, &minor, &patch);
     assert(major >= 2);
