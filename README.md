@@ -92,9 +92,27 @@ opt.addEqualityConstraint((x, gradient) {
 
 Constraints follow the objective's slice lifetime and exception rules. Each registration retains its own callback across solves. The [consumer test](tests/consumer/source/app.d) includes the NLopt MMA tutorial with two separately captured cubic inequalities.
 
+## Vector-valued nonlinear constraints
+
+Use `addEqualityMConstraint` or `addInequalityMConstraint` to evaluate several residuals at the same point. Supply one nonnegative absolute feasibility tolerance per residual. NLopt copies these tolerances at registration. An empty tolerance slice registers no constraints.
+
+The callback borrows all three slices for one invocation. Write every residual. When NLopt requests derivatives, write one row per residual in the flat gradient slice. For `n` coordinates, `gradient[i * n + j]` is the derivative of residual `i` with respect to coordinate `j`.
+
+```d
+import nloptd;
+
+auto opt = Optimizer(Algorithm.ldSLSQP, 3);
+opt.addEqualityMConstraint((residuals, x, gradient) {
+    residuals[0] = x[0] + 2 * x[1] - 3;
+    residuals[1] = -x[1] + 3 * x[2] - 8;
+    if (gradient.length)
+        gradient[] = [1.0, 2, 0, 0, -1, 3];
+}, [1e-9, 1e-8]);
+```
+
 ## Migrating from 0.2.1
 
-Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Pass a scalar or one value per coordinate to `setLowerBounds` and `setUpperBounds`. Use the raw C API for vector-valued constraints and subsidiary optimizer configuration. The DUB package no longer depends on libnlopt.
+Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Pass a scalar or one value per coordinate to `setLowerBounds` and `setUpperBounds`. Use the raw C API for subsidiary optimizer configuration. The DUB package no longer depends on libnlopt.
 
 ## License
 
