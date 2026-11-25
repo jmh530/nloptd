@@ -489,6 +489,49 @@ struct Optimizer
         addEqualityMConstraint(toDelegate(constraint), tolerances);
     }
 
+    /** Set the target objective value for minimization.
+        Params:
+            value = Stop when the objective reaches this value or lower. Negative infinity disables the target.
+        Throws: Exception for an inactive owner, active solve or native failure.
+    */
+    void setStopValue(double value)
+    {
+        auto s = idle();
+        s.check(c.nlopt_set_stopval(s.handle, value));
+    }
+
+    /** Set the relative tolerance on changes in the objective value.
+        Params:
+            tolerance = Fractional change in the objective value. Nonpositive values disable this criterion.
+        Throws: Exception for an inactive owner, active solve or native failure.
+    */
+    void setFTolRel(double tolerance)
+    {
+        auto s = idle();
+        s.check(c.nlopt_set_ftol_rel(s.handle, tolerance));
+    }
+
+    /** Set the absolute tolerance on changes in the objective value.
+        Params:
+            tolerance = Tolerance in objective units. Nonpositive values disable this criterion.
+        Throws: Exception for an inactive owner, active solve or native failure.
+    */
+    void setFTolAbs(double tolerance)
+    {
+        auto s = idle();
+        s.check(c.nlopt_set_ftol_abs(s.handle, tolerance));
+    }
+
+    unittest
+    {
+        // Both criteria report fToleranceReached, but use separate native settings.
+        auto opt = Optimizer(Algorithm.lnNelderMead, 1);
+        opt.setFTolAbs(0.125);
+        opt.setFTolRel(0.25);
+        assert(c.nlopt_get_ftol_abs(opt.state.handle) == 0.125);
+        assert(c.nlopt_get_ftol_rel(opt.state.handle) == 0.25);
+    }
+
     /** Set the relative tolerance on changes in coordinates.
         Params:
             tolerance = Relative tolerance. Zero disables this criterion.
@@ -500,6 +543,47 @@ struct Optimizer
         s.check(c.nlopt_set_xtol_rel(s.handle, tolerance));
     }
 
+    /** Set the same absolute tolerance on every coordinate.
+        Params:
+            tolerance = Tolerance in coordinate units. Nonpositive values disable this criterion.
+        Throws: Exception for an inactive owner, active solve or native failure.
+    */
+    void setXTolAbs(double tolerance)
+    {
+        auto s = idle();
+        s.check(c.nlopt_set_xtol_abs1(s.handle, tolerance));
+    }
+
+    /** Set an absolute tolerance for each coordinate.
+        Params:
+            tolerances = One tolerance per dimension in coordinate order, copied by NLopt.
+                Use positive tolerances for all coordinates to enable this criterion.
+        Throws: Exception for a dimension mismatch, inactive owner, active solve or native failure.
+    */
+    void setXTolAbs(scope const(double)[] tolerances)
+    {
+        auto s = idle();
+        enforce(tolerances.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
+        s.check(c.nlopt_set_xtol_abs(s.handle, tolerances.ptr));
+    }
+
+    unittest
+    {
+        import std.exception : assertThrown;
+        auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+        double[2] actual;
+        opt.setXTolAbs(0.5);
+        opt.state.check(c.nlopt_get_xtol_abs(opt.state.handle, actual.ptr));
+        assert(actual == [0.5, 0.5]);
+
+        double[2] tolerances = [0.25, 0.125];
+        opt.setXTolAbs(tolerances[]);
+        tolerances[] = 0;
+        assertThrown(opt.setXTolAbs(tolerances[0 .. 1]));
+        opt.state.check(c.nlopt_get_xtol_abs(opt.state.handle, actual.ptr));
+        assert(actual == [0.25, 0.125]);
+    }
+
     /** Set the evaluation limit.
         Params:
             limit = Maximum evaluations requested. Nonpositive values disable the limit.
@@ -509,6 +593,26 @@ struct Optimizer
     {
         auto s = idle();
         s.check(c.nlopt_set_maxeval(s.handle, limit));
+    }
+
+    /** Set the approximate time limit for each optimization run.
+        Params:
+            seconds = Time limit in seconds. Nonpositive values disable the limit.
+        Throws: Exception for an inactive owner, active solve or native failure.
+    */
+    void setMaxTime(double seconds)
+    {
+        auto s = idle();
+        s.check(c.nlopt_set_maxtime(s.handle, seconds));
+    }
+
+    unittest
+    {
+        auto opt = Optimizer(Algorithm.lnNelderMead, 1);
+        opt.setMaxTime(0.125);
+        assert(c.nlopt_get_maxtime(opt.state.handle) == 0.125);
+        opt.setMaxTime(0);
+        assert(c.nlopt_get_maxtime(opt.state.handle) == 0);
     }
 
     /** Request termination from a callback on this optimizer's thread.
