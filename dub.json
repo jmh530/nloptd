@@ -3,7 +3,7 @@
     "description": "A D interface to the native NLopt optimization library",
     "authors": ["John Michael Hall"],
     "copyright": "Copyright © 2016-2026, John Michael Hall",
-    "license": "LGPL-2.1-or-later",
+    "license": "MIT",
     "targetType": "library",
     "importPaths": ["source", "$NLOPT_INCLUDE_DIR"],
     "libs-posix": ["nlopt"],

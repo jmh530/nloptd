@@ -73,4 +73,8 @@ A local optimizer releases its native handle at scope exit. If the owner is dest
 
 Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Bounds, nonlinear constraints and subsidiary optimizer configuration are available through the raw C API while the high-level port is in progress. The DUB package no longer depends on libnlopt.
 
-The wrapper is licensed under LGPL-2.1-or-later. See COPYING.LESSER.txt and upstream's [native library licensing](https://github.com/stevengj/nlopt/blob/v2.11.0/COPYING).
+## License
+
+The modernized D wrapper is distributed under the [MIT License](LICENSE). The [v0.2.1 release](https://github.com/jmh530/nloptd/tree/v0.2.1) was distributed under LGPL-2.1-or-later.
+
+The separately installed native NLopt library has its own license terms. Upstream NLopt 2.11.0 documents LGPL-2.1-or-later for its default build and MIT for builds that omit the Luksan solvers. [NLopt licensing](https://github.com/stevengj/nlopt/blob/v2.11.0/COPYING)
