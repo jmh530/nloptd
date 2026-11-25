@@ -1,4 +1,4 @@
-/// Optimizer ownership, scalar objectives and termination results.
+/// Optimizer ownership, scalar objectives and constraints, and termination results.
 module nloptd.optimizer;
 
 private import c = nloptd.raw;
@@ -10,6 +10,7 @@ enum Algorithm
 {
     lnNelderMead = c.NLOPT_LN_NELDERMEAD,
     ldLBFGS = c.NLOPT_LD_LBFGS,
+    ldMMA = c.NLOPT_LD_MMA,
     ldSLSQP = c.NLOPT_LD_SLSQP,
 }
 
@@ -38,7 +39,7 @@ struct OptimizationResult
 }
 
 /// Receives the borrowed point and optional writable gradient for one evaluation.
-/// Fill the whole gradient when nonempty and return the objective value.
+/// Fill the whole gradient when nonempty and return the objective or constraint value.
 alias Objective = double delegate(scope const(double)[] x, scope double[] gradient);
 
 /// Failure reported by a native operation.
@@ -92,13 +93,20 @@ private struct NativeOwner
     }
 }
 
-// C borrows this record. The owner and an active solve retain it across GC
-// collections. Moving the owner preserves the address registered with C.
+// Each native callback borrows a stable record retained by the solve state.
+private struct ScalarCallback
+{
+    State* state;
+    Objective callable;
+    ScalarCallback* nextConstraint;
+}
+
 private struct State
 {
     // Borrowed from NativeOwner for configuration and callback dispatch.
     c.nlopt_opt handle;
-    Objective objective;
+    ScalarCallback objective;
+    ScalarCallback* constraints;
     Throwable pending;
     bool running;
 
@@ -113,11 +121,12 @@ private struct State
 
 private extern(C) double evaluate(uint n, const(double)* x, double* gradient, void* data)
 {
-    auto state = cast(State*) data;
+    auto callback = cast(ScalarCallback*) data;
+    auto state = callback.state;
     if (!state.pending)
     {
         try
-            return state.objective(x[0 .. n], gradient ? gradient[0 .. n] : null);
+            return callback.callable(x[0 .. n], gradient ? gradient[0 .. n] : null);
         catch (Throwable error)
         {
             state.pending = error;
@@ -202,8 +211,8 @@ struct Optimizer
     {
         auto s = idle();
         enforce(objective !is null, "Missing objective");
-        s.check(c.nlopt_set_min_objective(s.handle, &evaluate, s));
-        s.objective = objective;
+        s.check(c.nlopt_set_min_objective(s.handle, &evaluate, &s.objective));
+        s.objective = ScalarCallback(s, objective);
     }
 
     /** Register a D function to minimize.
@@ -264,6 +273,70 @@ struct Optimizer
         s.check(c.nlopt_set_upper_bounds(s.handle, bounds.ptr));
     }
 
+    private void addConstraint(alias register)(Objective constraint, double tolerance)
+    {
+        auto s = idle();
+        enforce(constraint !is null, "Missing constraint");
+        enforce(tolerance >= 0, "Constraint tolerance must be nonnegative");
+        auto callback = new ScalarCallback(s, constraint, s.constraints);
+        s.check(register(s.handle, &evaluate, callback, tolerance));
+        s.constraints = callback;
+    }
+
+    /** Add a scalar inequality constraint $(I c(x) ≤ 0).
+        Params:
+            constraint = Retained delegate returning c(x). Fill the gradient when requested.
+                Both slices are borrowed for one evaluation.
+            tolerance = Nonnegative absolute tolerance for judging feasibility at termination.
+        Throws: Exception for a missing callback, invalid tolerance, inactive owner,
+            active solve or native failure (including an unsupported algorithm).
+    */
+    void addInequalityConstraint(Objective constraint, double tolerance = 0)
+    {
+        addConstraint!(c.nlopt_add_inequality_constraint)(constraint, tolerance);
+    }
+
+    /** Add a scalar inequality constraint using a D function.
+        Params:
+            constraint = Function with the same contract as the delegate overload.
+            tolerance = Nonnegative feasibility tolerance, zero by default.
+        Throws: Exception under the same conditions as the delegate overload.
+    */
+    void addInequalityConstraint(double function(scope const(double)[], scope double[]) constraint,
+                                 double tolerance = 0)
+    {
+        import std.functional : toDelegate;
+        enforce(constraint !is null, "Missing constraint");
+        addInequalityConstraint(toDelegate(constraint), tolerance);
+    }
+
+    /** Add a scalar equality constraint $(I h(x) = 0).
+        Params:
+            constraint = Retained delegate returning h(x). Fill the gradient when requested.
+                Both slices are borrowed for one evaluation.
+            tolerance = Nonnegative absolute tolerance for judging feasibility at termination.
+        Throws: Exception for a missing callback, invalid tolerance, inactive owner,
+            active solve or native failure (including an unsupported algorithm).
+    */
+    void addEqualityConstraint(Objective constraint, double tolerance = 0)
+    {
+        addConstraint!(c.nlopt_add_equality_constraint)(constraint, tolerance);
+    }
+
+    /** Add a scalar equality constraint using a D function.
+        Params:
+            constraint = Function with the same contract as the delegate overload.
+            tolerance = Nonnegative feasibility tolerance, zero by default.
+        Throws: Exception under the same conditions as the delegate overload.
+    */
+    void addEqualityConstraint(double function(scope const(double)[], scope double[]) constraint,
+                               double tolerance = 0)
+    {
+        import std.functional : toDelegate;
+        enforce(constraint !is null, "Missing constraint");
+        addEqualityConstraint(toDelegate(constraint), tolerance);
+    }
+
     /** Set the relative tolerance on changes in coordinates.
         Params:
             tolerance = Relative tolerance. Zero disables this criterion.
@@ -307,7 +380,7 @@ struct Optimizer
     OptimizationResult optimizeInPlace(scope double[] point)
     {
         auto s = idle();
-        enforce(s.objective !is null, "Missing objective");
+        enforce(s.objective.callable !is null, "Missing objective");
         enforce(point.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
         auto activeOwner = owner;
         activeOwner.retain();
