@@ -10,6 +10,7 @@ void main()
         if (gradient.length) gradient[0] = 2 * delta;
         return delta * delta;
     });
+    opt.setUpperBounds(1.0);
     opt.setXTolRel(1e-9);
     opt.setMaxEvaluations(200);
     double[1] point = [0.25];

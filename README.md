@@ -45,7 +45,7 @@ dub run --root=tests/consumer --compiler="$dc"
 
 For your own DUB project, run the same preprocessing commands, then use `dub build --compiler="$dc"` from your project root. Keep the generated directory available to DUB: `nloptd.raw` imports `nlopt.i` from it and links against the installed NLopt library. Regenerate the file and rebuild with `--force` after changing the headers, compiler, or target. The temporary directory can be removed when those builds are finished.
 
-## Scalar minimization
+## Bound-constrained minimization
 
 ```d
 import nloptd;
@@ -57,12 +57,13 @@ opt.setMinObjective((x, grad) {
     if (grad.length) grad[0] = 2 * delta;
     return delta * delta;
 });
+opt.setUpperBounds(1.0);
 opt.setXTolRel(1e-9);
 opt.setMaxEvaluations(200);
 
 double[1] point = [0.25];
 auto result = opt.optimizeInPlace(point[]);
-// point[0] is approximately 2. result contains value, termination and evaluations.
+// The minimum occurs at the upper bound. Both point[0] and result.value are approximately 1.
 ```
 
 The callback borrows both slices for one invocation. An empty gradient means NLopt requests only the value. The registration retains the delegate between runs. Exceptions stop the native solve and propagate back to the caller as the original D throwable. Call `forceStop()` from a callback to request an ordinary interrupted result. Interpret partial results using the termination reason.
@@ -71,7 +72,7 @@ A local optimizer releases its native handle at scope exit. If the owner is dest
 
 ## Migrating from 0.2.1
 
-Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Bounds, nonlinear constraints and subsidiary optimizer configuration are available through the raw C API while the high-level port is in progress. The DUB package no longer depends on libnlopt.
+Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Pass a scalar or one value per coordinate to `setLowerBounds` and `setUpperBounds`. Use the raw C API for nonlinear constraints and subsidiary optimizer configuration. The DUB package no longer depends on libnlopt.
 
 ## License
 
