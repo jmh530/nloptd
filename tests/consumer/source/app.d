@@ -26,8 +26,43 @@ private double sphere(scope const(double)[] x, scope double[] gradient)
     return x[0] * x[0];
 }
 
+private void testBounds()
+{
+    auto opt = Optimizer(Algorithm.ldSLSQP, 2);
+    opt.setMinObjective((x, gradient) {
+        const dx = x[0] + 2;
+        const dy = x[1] - 3;
+        if (gradient.length)
+        {
+            gradient[0] = 2 * dx;
+            gradient[1] = 2 * dy;
+        }
+        return dx * dx + dy * dy;
+    });
+    opt.setXTolRel(1e-9);
+    opt.setMaxEvaluations(200);
+    opt.setLowerBounds(0.0);
+    opt.setUpperBounds(1.0);
+    double[2] point = [0.5, 0.5];
+    auto result = opt.optimizeInPlace(point[]);
+    assert(abs(point[0]) < 1e-6 && abs(point[1] - 1) < 1e-6);
+    assert(abs(result.value - 8) < 1e-6);
+
+    double[2] lower = [-1, -5], upper = [5, 2];
+    opt.setLowerBounds(lower[]);
+    opt.setUpperBounds(upper[]);
+    lower[] = 0;
+    upper[] = 1;
+    assertThrown(opt.setLowerBounds(lower[0 .. 1]));
+    assertThrown(opt.setUpperBounds([0.0, 0.0, 0.0]));
+    result = opt.optimizeInPlace(point[]);
+    assert(abs(point[0] + 1) < 1e-6 && abs(point[1] - 2) < 1e-6);
+    assert(abs(result.value - 2) < 1e-6);
+}
+
 void main()
 {
+    testBounds();
     int major, minor, patch;
     nlopt_version(&major, &minor, &patch);
     assert(major >= 2);

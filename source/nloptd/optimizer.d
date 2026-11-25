@@ -218,6 +218,52 @@ struct Optimizer
         setMinObjective(toDelegate(objective));
     }
 
+    /** Set the same lower bound on every coordinate.
+        Params:
+            bound = Uniform bound. Use negative infinity to remove the bound.
+        Throws: Exception for an inactive owner, active solve or native failure.
+    */
+    void setLowerBounds(double bound)
+    {
+        auto s = idle();
+        s.check(c.nlopt_set_lower_bounds1(s.handle, bound));
+    }
+
+    /** Set a lower bound for each coordinate.
+        Params:
+            bounds = One value per dimension, copied by NLopt. Use negative infinity to remove an individual bound.
+        Throws: Exception for a dimension mismatch, an inactive owner, active solve or native failure.
+    */
+    void setLowerBounds(scope const(double)[] bounds)
+    {
+        auto s = idle();
+        enforce(bounds.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
+        s.check(c.nlopt_set_lower_bounds(s.handle, bounds.ptr));
+    }
+
+    /** Set the same upper bound on every coordinate.
+        Params:
+            bound = Uniform bound. Use positive infinity to remove the bound.
+        Throws: Exception for an inactive owner, active solve or native failure.
+    */
+    void setUpperBounds(double bound)
+    {
+        auto s = idle();
+        s.check(c.nlopt_set_upper_bounds1(s.handle, bound));
+    }
+
+    /** Set an upper bound for each coordinate.
+        Params:
+            bounds = One value per dimension, copied by NLopt. Use positive infinity to remove an individual bound.
+        Throws: Exception for a dimension mismatch, an inactive owner, active solve or native failure.
+    */
+    void setUpperBounds(scope const(double)[] bounds)
+    {
+        auto s = idle();
+        enforce(bounds.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
+        s.check(c.nlopt_set_upper_bounds(s.handle, bounds.ptr));
+    }
+
     /** Set the relative tolerance on changes in coordinates.
         Params:
             tolerance = Relative tolerance. Zero disables this criterion.
