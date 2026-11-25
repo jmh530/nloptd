@@ -55,5 +55,8 @@ jobs:
       - run: |
           apt-get update
           apt-get install -y gdc-16 dub libnlopt-dev pkg-config
-          export NLOPT_INCLUDE_DIR="$(pkg-config --variable=includedir nlopt)"
-          dub run --root=tests/consumer --compiler=/usr/bin/gdc-16
+          dc=/usr/bin/gdc-16
+          header="$(pkg-config --variable=includedir nlopt)/nlopt.h"
+          export NLOPT_INCLUDE_DIR="$(mktemp -d)"
+          "$dc" -std=c11 -E -x c "$header" -o "$NLOPT_INCLUDE_DIR/nlopt.i"
+          dub run --root=tests/consumer --compiler="$dc"

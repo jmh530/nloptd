@@ -4,9 +4,9 @@ A D interface to the native NLopt optimization library. The development API prov
 
 ## Build and run
 
-Install a D compiler with direct ImportC header support, DUB, a working host C preprocessor and the NLopt development headers and shared library for your target architecture. Primary targets are DMD 2.114.0 and LDC 1.43.0 on Windows x64 and Ubuntu x86-64. The development tests use NLopt 2.11.0.
+Install a D compiler with ImportC support, DUB, a working host C preprocessor and the NLopt development headers and shared library for your target architecture. Primary targets are DMD 2.114.0 and LDC 1.43.0 on Windows x64 and Ubuntu x86-64. The development tests use NLopt 2.11.0.
 
-On Ubuntu with `libnlopt-dev` and `pkg-config` installed:
+With DMD or LDC on Ubuntu, install `libnlopt-dev` and `pkg-config`, then run:
 
 ```sh
 export NLOPT_INCLUDE_DIR="$(pkg-config --variable=includedir nlopt)"
@@ -27,7 +27,23 @@ dub run --root=example
 dub run --root=tests/consumer
 ```
 
-These settings apply to downstream DUB builds as well. Use headers, import library and DLL from the same installation. The module name `nlopt` must resolve to that header. [NLopt installation guide](https://nlopt.readthedocs.io/en/latest/NLopt_Installation/)
+These settings apply to downstream DUB builds as well. Use the header and native library from the same installation. With DMD and LDC, the module name `nlopt` must resolve to that header. [NLopt installation guide](https://nlopt.readthedocs.io/en/latest/NLopt_Installation/)
+
+### Experimental GDC 16 support on Debian
+
+GDC 16.2 finds `nlopt.h` but rejects directives such as `#ifndef` when importing it directly. Use GDC's C preprocessor to produce `nlopt.i` from the installed header. Select C11 explicitly because GCC 16's default C mode exposes a C23 `nullptr_t` declaration in `<stddef.h>` that this version of ImportC cannot parse. [GDC ImportC manual](https://gcc.gnu.org/onlinedocs/gdc/ImportC.html)
+
+Install `gdc-16`, `dub`, `libnlopt-dev`, and `pkg-config`. From the repository root on Debian sid x86-64, run:
+
+```sh
+dc=/usr/bin/gdc-16
+header="$(pkg-config --variable=includedir nlopt)/nlopt.h"
+export NLOPT_INCLUDE_DIR="$(mktemp -d)"
+"$dc" -std=c11 -E -x c "$header" -o "$NLOPT_INCLUDE_DIR/nlopt.i"
+dub run --root=tests/consumer --compiler="$dc"
+```
+
+For your own DUB project, run the same preprocessing commands, then use `dub build --compiler="$dc"` from your project root. Keep the generated directory available to DUB: `nloptd.raw` imports `nlopt.i` from it and links against the installed NLopt library. Regenerate the file and rebuild with `--force` after changing the headers, compiler, or target. The temporary directory can be removed when those builds are finished.
 
 ## Scalar minimization
 
