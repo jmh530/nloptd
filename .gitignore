@@ -6,3 +6,12 @@ __dummy.html
 *.obj
 dub.selections.json
 __test__library__.exe
+/nloptd.lib
+/libnloptd.a
+/nloptd-test-library
+/nloptd-test-library.exe
+/example/nloptd-example
+/example/nloptd-example.exe
+/tests/consumer/nloptd-consumer-test
+/tests/consumer/nloptd-consumer-test.exe
+*.pdb

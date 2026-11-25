@@ -1,25 +1,11 @@
 {
-	"name" : "nloptd",
-	"description": "A D-style wrapper over libnlopt",
-	"authors": ["John Michael Hall"],
-	"license": "LGPL-2.1 or later",
-	"copyright": "Copyright © 2016, John Michael Hall",
-	"dependencies": {
-		"nlopt": ">=0.1.0",
-	},
-	"version": "0.2.1",
-	"dflags-windows-x86-dmd": ["-m32mscoff"],
-	"configurations": [
-		{
-			"name": "nloptd-library",
-			"targetType": "library",
-			"version": ["NloptDLibrary"],
-		},
-		{
-			"name": "example",
-			"targetType": "executable",
-			"version": ["ExampleApp"],
-			"sourceFiles": ["example/example.d"],
-		}
-	],
+    "name": "nloptd",
+    "description": "A D interface to the native NLopt optimization library",
+    "authors": ["John Michael Hall"],
+    "copyright": "Copyright © 2016-2026, John Michael Hall",
+    "license": "LGPL-2.1-or-later",
+    "targetType": "library",
+    "importPaths": ["source", "$NLOPT_INCLUDE_DIR"],
+    "libs-posix": ["nlopt"],
+    "sourceFiles-windows": ["$NLOPT_LIB_DIR/nlopt.lib"]
 }
