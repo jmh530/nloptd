@@ -196,8 +196,35 @@ private void testVectorInequality()
     assert(abs(point[0] - 1) < 1e-6 && abs(result.value - 1) < 1e-6);
 }
 
+private void testStoppingCriteria()
+{
+    auto opt = Optimizer(Algorithm.lnNelderMead, 1);
+    opt.setMinObjective((x, gradient) => 1 + x[0] * x[0]);
+    opt.setMaxEvaluations(200);
+    double[1] point = [3];
+    opt.setStopValue(1.25);
+    auto result = opt.optimizeInPlace(point[]);
+    assert(result.termination == Termination.stopValueReached && result.value <= 1.25);
+
+    opt.setStopValue(-double.infinity);
+    opt.setFTolRel(1e-6);
+    point[0] = 3;
+    assert(opt.optimizeInPlace(point[]).termination == Termination.fToleranceReached);
+
+    opt.setFTolRel(0);
+    opt.setFTolAbs(1e-6);
+    point[0] = 3;
+    assert(opt.optimizeInPlace(point[]).termination == Termination.fToleranceReached);
+
+    opt.setFTolAbs(0);
+    opt.setXTolAbs(1e-6);
+    point[0] = 3;
+    assert(opt.optimizeInPlace(point[]).termination == Termination.xToleranceReached);
+}
+
 void main()
 {
+    testStoppingCriteria();
     testMmaWorkspaceLimit();
     testVectorEquality();
     testVectorInequality();
