@@ -70,6 +70,12 @@ The callback borrows both slices for one invocation. An empty gradient means NLo
 
 A local optimizer releases its native handle at scope exit. If the owner is destroyed during an evaluation, the active solve retains the handle until it finishes handling the result or callback exception. For a GC-managed class with an `Optimizer` field, prefer explicit destruction when the resource is no longer needed. If relying on GC finalization, declare a class destructor (an empty `~this() {}` suffices). With DMD 2.114.0, the field destructor alone did not mark the enclosing class allocation for finalization.
 
+## Stopping criteria
+
+Choose criteria in the units of the problem. For minimization, `setStopValue(target)` sets a target objective value. `setFTolAbs` and `setFTolRel` set tolerances on changes in the objective. `setXTolAbs` accepts either a uniform absolute tolerance or one per coordinate. For example, `opt.setXTolAbs([1e-4, 1e-8])` gives a two-dimensional problem different absolute tolerances for its two coordinates. Use `setXTolRel` for a relative coordinate tolerance.
+
+Use `setMaxEvaluations` to limit objective evaluations or `setMaxTime` for an approximate time limit in seconds. An evaluation in progress can run past the time limit. Check `result.termination` to see which criterion ended the run.
+
 ## Scalar nonlinear constraints
 
 Use `addInequalityConstraint` for `c(x) ≤ 0` and `addEqualityConstraint` for `h(x) = 0`. Each call registers another constraint. The optional second argument is the absolute tolerance NLopt uses to judge feasibility when stopping. It defaults to zero. Select an algorithm that supports the constraints you need, such as SLSQP for equalities or MMA for inequalities.
