@@ -117,6 +117,31 @@ private struct Callback(F)
 private alias ScalarCallback = Callback!Objective;
 private alias VectorCallback = Callback!VectorConstraint;
 
+// NLopt 2.11.0's MMA and CCSAQ workspaces contain 6*n + m*(2*n + 7)
+// doubles. The element count is computed in unsigned C arithmetic.
+private uint mmaResidualCapacity(uint dimension)
+{
+    import std.algorithm.comparison : min;
+    enum maxElements = min(ulong(uint.max), ulong(size_t.max / double.sizeof));
+    const base = 6UL * dimension;
+    enforce(base <= maxElements, "MMA/CCSAQ workspace dimension is too large");
+    return cast(uint)((maxElements - base) / (2UL * dimension + 7));
+}
+
+unittest
+{
+    import std.exception : assertThrown;
+    enum ulong limit = size_t.sizeof == 4 ? size_t.max / double.sizeof : uint.max;
+    enum uint lastDimension = cast(uint)(limit / 6);
+    assert(mmaResidualCapacity(lastDimension) == 0);
+    assertThrown(mmaResidualCapacity(lastDimension + 1));
+
+    enum uint n = 32_768;
+    const m = mmaResidualCapacity(n);
+    assert(6UL * n + 2UL * m * n + 7UL * m <= limit);
+    assert(6UL * n + 2UL * (m + 1) * n + 7UL * (m + 1) > limit);
+}
+
 private struct State
 {
     // Borrowed from NativeOwner for configuration and callback dispatch.
@@ -126,6 +151,14 @@ private struct State
     VectorCallback* vectorConstraints;
     Throwable pending;
     bool running;
+    uint remainingMmaResiduals = uint.max; // Sentinel for other algorithms.
+
+    uint remainingAfterAdding(uint count) const
+    {
+        if (remainingMmaResiduals == uint.max) return uint.max;
+        enforce(count <= remainingMmaResiduals, "Too many residuals for the MMA/CCSAQ workspace");
+        return remainingMmaResiduals - count;
+    }
 
     void check(c.nlopt_result code)
     {
@@ -206,6 +239,8 @@ struct Optimizer
     {
         enforce(dimension > 0, "NLopt requires a positive dimension");
         state = new State;
+        if (algorithm == c.NLOPT_LD_MMA || algorithm == c.NLOPT_LD_CCSAQ)
+            state.remainingMmaResiduals = mmaResidualCapacity(dimension);
         owner = NativeOwner.create(algorithm, dimension);
         state.handle = owner.handle;
     }
@@ -319,8 +354,10 @@ struct Optimizer
         auto s = idle();
         enforce(constraint !is null, "Missing constraint");
         enforce(tolerance >= 0, "Constraint tolerance must be nonnegative");
+        const remaining = s.remainingAfterAdding(1);
         auto callback = new ScalarCallback(s, constraint, s.constraints);
         s.check(register(s.handle, &evaluate, callback, tolerance));
+        s.remainingMmaResiduals = remaining;
         s.constraints = callback;
     }
 
@@ -384,12 +421,15 @@ struct Optimizer
         enforce(constraint !is null, "Missing constraint");
         if (!tolerances.length) return;
         enforce(tolerances.length <= uint.max, "Too many constraint residuals");
+        const count = cast(uint) tolerances.length;
+        const remaining = s.remainingAfterAdding(count);
         enforce(tolerances.length <= size_t.max / double.sizeof / c.nlopt_get_dimension(s.handle),
                 "Constraint gradient is too large");
         foreach (tolerance; tolerances)
             enforce(tolerance >= 0, "Constraint tolerance must be nonnegative");
         auto callback = new VectorCallback(s, constraint, s.vectorConstraints);
-        s.check(register(s.handle, cast(uint) tolerances.length, &evaluateVector, callback, tolerances.ptr));
+        s.check(register(s.handle, count, &evaluateVector, callback, tolerances.ptr));
+        s.remainingMmaResiduals = remaining;
         s.vectorConstraints = callback;
     }
 

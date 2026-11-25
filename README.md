@@ -96,6 +96,8 @@ Constraints follow the objective's slice lifetime and exception rules. Each regi
 
 Use `addEqualityMConstraint` or `addInequalityMConstraint` to evaluate several residuals at the same point. Supply one nonnegative absolute feasibility tolerance per residual. NLopt copies these tolerances at registration. An empty tolerance slice registers no constraints.
 
+For MMA and CCSAQ, NLopt 2.11.0 calculates its workspace size using unsigned integer arithmetic. The wrapper checks the dimension at construction and the total number of residuals across scalar and vector registrations before adding a constraint.
+
 The callback borrows all three slices for one invocation. Write every residual. When NLopt requests derivatives, write one row per residual in the flat gradient slice. For `n` coordinates, `gradient[i * n + j]` is the derivative of residual `i` with respect to coordinate `j`.
 
 ```d

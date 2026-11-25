@@ -198,6 +198,7 @@ private void testVectorInequality()
 
 void main()
 {
+    testMmaWorkspaceLimit();
     testVectorEquality();
     testVectorInequality();
     testBounds();
@@ -243,4 +244,27 @@ void main()
     result = opt.optimizeInPlace(x[]);
     assert(result.evaluations > 1 && abs(x[0]) < 1e-6);
     assertThrown(opt.forceStop());
+}
+
+private void testMmaWorkspaceLimit()
+{
+    import nloptd.raw : NLOPT_LD_CCSAQ, NLOPT_LD_MMA;
+
+    enum uint n = 32_768;
+    enum ulong limit = size_t.sizeof == 4 ? size_t.max / double.sizeof : uint.max;
+    enum capacity = (limit - 6UL * n) / (2UL * n + 7);
+    auto tolerances = new double[capacity - 1];
+    tolerances[] = 0;
+    VectorConstraint vector = (values, x, grad) {};
+    Objective scalar = (x, grad) => 0.0;
+    foreach (algorithm; [NLOPT_LD_MMA, NLOPT_LD_CCSAQ])
+    {
+        auto opt = Optimizer(algorithm, n);
+        opt.addInequalityMConstraint(vector, tolerances);
+        assertThrown!NloptException(opt.addEqualityConstraint(scalar));
+        assertThrown(opt.addInequalityMConstraint(vector, [0.0, 0.0]));
+        opt.addInequalityConstraint(scalar);
+        assertThrown(opt.addInequalityConstraint(scalar));
+        assertThrown(opt.addInequalityMConstraint(vector, [0.0]));
+    }
 }
