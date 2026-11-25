@@ -1,0 +1,59 @@
+name: Test
+on: [push, pull_request]
+
+jobs:
+  consumer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        compiler: [dmd-2.114.0, ldc-1.43.0]
+        include:
+          - os: ubuntu-24.04
+            compiler: dmd-2.112.0
+          - os: ubuntu-24.04
+            compiler: ldc-1.42.0
+          - os: macos-latest
+            compiler: ldc-1.43.0
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libnlopt-dev
+          echo "NLOPT_INCLUDE_DIR=$(pkg-config --variable=includedir nlopt)" >> "$GITHUB_ENV"
+      - if: runner.os == 'macOS'
+        run: |
+          brew install nlopt
+          echo "NLOPT_INCLUDE_DIR=$(brew --prefix nlopt)/include" >> "$GITHUB_ENV"
+          echo "LIBRARY_PATH=$(brew --prefix nlopt)/lib" >> "$GITHUB_ENV"
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          vcpkg install nlopt:x64-windows
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $prefix = Join-Path $env:VCPKG_INSTALLATION_ROOT installed/x64-windows
+          "NLOPT_INCLUDE_DIR=$prefix/include" >> $env:GITHUB_ENV
+          "NLOPT_LIB_DIR=$prefix/lib" >> $env:GITHUB_ENV
+          "$prefix/bin" >> $env:GITHUB_PATH
+      - shell: bash
+        run: |
+          dub test --compiler="$DC"
+          dub run --root=tests/consumer --compiler="$DC"
+          dub run --root=example --compiler="$DC"
+
+  gdc:
+    runs-on: ubuntu-24.04
+    container: debian:sid
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          apt-get update
+          apt-get install -y gdc-16 dub libnlopt-dev pkg-config
+          export NLOPT_INCLUDE_DIR="$(pkg-config --variable=includedir nlopt)"
+          dub run --root=tests/consumer --compiler=/usr/bin/gdc-16
