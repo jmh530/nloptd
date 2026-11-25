@@ -1,0 +1,6 @@
+{
+    "name": "nloptd-example",
+    "targetType": "executable",
+    "mainSourceFile": "example.d",
+    "dependencies": {"nloptd": {"path": ".."}}
+}
