@@ -176,7 +176,7 @@ The wrapper checks AUGLAG's workspace size using the total number of residuals i
 
 ## Migrating from 0.2.1
 
-Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Pass a scalar or one value per coordinate to `setLowerBounds` and `setUpperBounds`. Use `setLocalOptimizer` for subsidiary optimizer configuration. The DUB package no longer depends on libnlopt.
+See the [migration guide](MIGRATION.md) for a before-and-after example, method names, and changes to ownership and callbacks.
 
 ## License
 
