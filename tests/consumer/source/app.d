@@ -222,8 +222,57 @@ private void testStoppingCriteria()
     assert(opt.optimizeInPlace(point[]).termination == Termination.xToleranceReached);
 }
 
+private void testLocalOptimizer()
+{
+    auto opt = Optimizer(Algorithm.auglag, 1);
+    opt.setMinObjective((x, grad) {
+        if (grad.length) grad[0] = 2 * x[0];
+        return x[0] * x[0];
+    });
+    opt.addEqualityConstraint((x, grad) {
+        if (grad.length) grad[0] = 1;
+        return x[0] - 1;
+    }, 1e-8);
+    opt.setXTolRel(1e-8);
+    opt.setMaxEvaluations(1000);
+    {
+        auto local = Optimizer(Algorithm.ldSLSQP, 1);
+        local.setLowerBounds(5);
+        local.setMinObjective((x, grad) { assert(0, "Unexpected local objective"); return 0.0; });
+        local.setXTolRel(1e-10);
+        opt.setLocalOptimizer(local);
+        local.setMaxEvaluations(1);
+    }
+    auto wrongDimension = Optimizer(Algorithm.ldSLSQP, 2);
+    assertThrown!NloptException(opt.setLocalOptimizer(wrongDimension));
+    import nloptd.raw : NLOPT_LD_AUGLAG_EQ;
+    auto incomplete = Optimizer(NLOPT_LD_AUGLAG_EQ, 1);
+    assertThrown(opt.setLocalOptimizer(incomplete));
+    assertThrown(opt.setLocalOptimizer(opt));
+    Optimizer inert;
+    assertThrown(opt.setLocalOptimizer(inert));
+    double[1] point = [2];
+    auto result = opt.optimizeInPlace(point[]);
+    assert(abs(point[0] - 1) < 1e-6 && abs(result.value - 1) < 1e-6);
+
+    incomplete.setMinObjective((x, grad) {
+        if (grad.length) grad[0] = 2 * x[0];
+        return x[0] * x[0];
+    });
+    incomplete.setStopValue(0.01);
+    incomplete.setMaxEvaluations(200);
+    assertThrown(incomplete.optimizeInPlace(point[]));
+    auto slsqp = Optimizer(Algorithm.ldSLSQP, 1);
+    slsqp.setXTolRel(1e-9);
+    incomplete.setLocalOptimizer(slsqp);
+    assert(incomplete.optimizeInPlace(point[]).value <= 0.01);
+}
+
 void main()
 {
+    testLocalOptimizer();
+    testDualSolverReplacement();
+    testNestedAuglagWorkspace();
     testStoppingCriteria();
     testMmaWorkspaceLimit();
     testVectorEquality();
@@ -273,9 +322,43 @@ void main()
     assertThrown(opt.forceStop());
 }
 
+private void testDualSolverReplacement()
+{
+    import c = nloptd.raw;
+
+    auto slsqp = Optimizer(Algorithm.ldSLSQP, 1);
+    slsqp.setXTolRel(1e-8);
+    slsqp.setMaxEvaluations(50);
+    foreach (algorithm; [c.NLOPT_LD_MMA, c.NLOPT_LD_CCSAQ])
+    {
+        auto opt = Optimizer(algorithm, 1);
+        opt.setLocalOptimizer(slsqp);
+        opt.setXTolRel(1e-8);
+        opt.setMaxEvaluations(200);
+        opt.setMinObjective((x, grad) {
+            if (grad.length) grad[0] = 2 * x[0];
+            return x[0] * x[0];
+        });
+        opt.addInequalityConstraint((x, grad) {
+            if (grad.length) grad[0] = -1;
+            return 1 - x[0];
+        });
+        foreach (variant; [c.NLOPT_AUGLAG, c.NLOPT_LD_AUGLAG, c.NLOPT_LN_AUGLAG,
+                c.NLOPT_AUGLAG_EQ, c.NLOPT_LD_AUGLAG_EQ, c.NLOPT_LN_AUGLAG_EQ])
+        {
+            auto auglag = Optimizer(variant, 1);
+            auglag.setLocalOptimizer(slsqp);
+            assertThrown(opt.setLocalOptimizer(auglag));
+        }
+        double[1] point = [2];
+        auto result = opt.optimizeInPlace(point[]);
+        assert(abs(point[0] - 1) < 1e-5 && abs(result.value - 1) < 1e-5);
+    }
+}
+
 private void testMmaWorkspaceLimit()
 {
-    import nloptd.raw : NLOPT_LD_CCSAQ, NLOPT_LD_MMA;
+    import nloptd.raw : NLOPT_AUGLAG_EQ, NLOPT_LD_CCSAQ, NLOPT_LD_MMA;
 
     enum uint n = 32_768;
     enum ulong limit = size_t.sizeof == 4 ? size_t.max / double.sizeof : uint.max;
@@ -293,5 +376,50 @@ private void testMmaWorkspaceLimit()
         opt.addInequalityConstraint(scalar);
         assertThrown(opt.addInequalityConstraint(scalar));
         assertThrown(opt.addInequalityMConstraint(vector, [0.0]));
+
+        auto parent = Optimizer(NLOPT_AUGLAG_EQ, n);
+        parent.addInequalityMConstraint(vector, tolerances);
+        parent.setLocalOptimizer(opt);
+        parent.addInequalityConstraint(scalar);
+        assertThrown(parent.addInequalityConstraint(scalar));
+        auto alternative = Optimizer(Algorithm.ldSLSQP, n);
+        parent.setLocalOptimizer(alternative);
+        parent.addInequalityConstraint(scalar);
+        assertThrown(parent.setLocalOptimizer(opt));
     }
+}
+
+private void testNestedAuglagWorkspace()
+{
+    import nloptd.raw : NLOPT_AUGLAG_EQ, NLOPT_LD_AUGLAG_EQ;
+
+    enum uint n = 32_768;
+    enum ulong mmaLimit = size_t.sizeof == 4 ? size_t.max / double.sizeof : uint.max;
+    enum capacity = (mmaLimit - 6UL * n) / (2UL * n + 7);
+    auto tolerances = new double[capacity + 1];
+    tolerances[] = 0;
+    VectorConstraint vector = (values, x, grad) {};
+
+    auto outer = Optimizer(NLOPT_AUGLAG_EQ, n);
+    auto inner = Optimizer(NLOPT_LD_AUGLAG_EQ, n);
+    auto mma = Optimizer(Algorithm.ldMMA, n);
+    inner.setLocalOptimizer(mma);
+    outer.setLocalOptimizer(inner);
+    auto slsqp = Optimizer(Algorithm.ldSLSQP, n);
+    inner.setLocalOptimizer(slsqp);
+    // The copy still uses the explicitly installed MMA until we replace it.
+    assertThrown(outer.addInequalityMConstraint(vector, tolerances));
+    outer.setLocalOptimizer(inner);
+    outer.addInequalityMConstraint(vector, tolerances);
+
+    enum ulong auglagLimit = size_t.sizeof == 4 ? size_t.max / double.sizeof : int.max;
+    enum width = (auglagLimit - n) / (n + 2);
+    auto wide = new double[width + 1];
+    wide[] = 0;
+    auto penalized = Optimizer(Algorithm.auglag, n);
+    penalized.setLocalOptimizer(slsqp);
+    assertThrown(penalized.addEqualityMConstraint(vector, wide));
+    // The parent's inequalities would become the nested AUGLAG's penalties.
+    outer.addInequalityMConstraint(vector, wide);
+    assertThrown(outer.setLocalOptimizer(penalized));
 }

@@ -118,9 +118,32 @@ opt.addEqualityMConstraint((residuals, x, gradient) {
 }, [1e-9, 1e-8]);
 ```
 
+## Subsidiary optimizers
+
+Use `setLocalOptimizer` to select the local algorithm and its stopping criteria. Configure the objective, bounds, and constraints on the parent. The local optimizer must have the same dimension. NLopt copies its configuration at registration, so you can reuse it or let it leave scope before the parent runs.
+
+```d
+import nloptd;
+
+auto opt = Optimizer(Algorithm.auglag, 1);
+{
+    auto local = Optimizer(Algorithm.ldSLSQP, 1);
+    local.setXTolRel(1e-10);
+    opt.setLocalOptimizer(local);
+}
+```
+
+Calling the setter again replaces the local solver. A dimension mismatch preserves the existing configuration. If NLopt reports an out-of-memory error while copying a replacement, install a local solver again before retrying the solve.
+
+All AUGLAG variants used through `Optimizer`, including legacy algorithm IDs, require an explicit local solver before a solve or before installation as another optimizer's subsidiary. You can register constraints before choosing the local solver. Callers using NLopt's legacy process-wide defaults can still access them through `nloptd.raw`.
+
+MMA and CCSAQ create their dual solver from the selected algorithm and stopping criteria. This discards the local solver AUGLAG needs, so `setLocalOptimizer` rejects all AUGLAG variants in that position and preserves the previously configured solver.
+
+The wrapper checks AUGLAG's workspace size using the total number of residuals it penalizes and the width of the largest constraint callback. AUGLAG_EQ forwards inequalities to its local solver, whose limits also apply.
+
 ## Migrating from 0.2.1
 
-Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Pass a scalar or one value per coordinate to `setLowerBounds` and `setUpperBounds`. Use the raw C API for subsidiary optimizer configuration. The DUB package no longer depends on libnlopt.
+Use `Optimizer` in place of `Opt`. Pass it by `ref` for configuration or transfer ownership with `std.algorithm.mutation.move`. Ordinary copies are disabled. Set stopping criteria explicitly. Replace `optimize(x, minf)` and `getResult()` with `optimizeInPlace(x)` and its returned result. Pass a scalar or one value per coordinate to `setLowerBounds` and `setUpperBounds`. Use `setLocalOptimizer` for subsidiary optimizer configuration. The DUB package no longer depends on libnlopt.
 
 ## License
 
