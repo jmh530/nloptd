@@ -143,6 +143,75 @@ unittest
     assert(6UL * n + 2UL * (m + 1) * n + 7UL * (m + 1) > limit);
 }
 
+// NLopt 2.11.0 stores these settings as unsigned but passes them to solvers
+// as int. Check explicit settings before NLopt copies them into the handle.
+private void checkPopulation(c.nlopt_algorithm algorithm, uint n, uint size)
+{
+    enforce(size <= int.max, "Population size exceeds the native integer range");
+    if (size == 0) return;
+    enum maxDoubles = size_t.max / double.sizeof;
+    switch (algorithm)
+    {
+        case c.NLOPT_GN_CRS2_LM:
+            // crs.c indexes the scratch point at size*(n+1) and allocates
+            // one more row for it. Both additions are signed in C.
+            const width = 1UL + n;
+            enforce(size >= width, "CRS2 needs at least dimension + 1 points");
+            enforce(size < int.max && width * size <= int.max &&
+                    width * (1UL + size) <= maxDoubles, "CRS2 population workspace is too large");
+            break;
+        case c.NLOPT_GN_ISRES:
+            // isres.c packs two population-by-n arrays, two population
+            // vectors and a scratch point into one signed element count.
+            const elements = 2UL * size * (1UL + n) + n;
+            enforce(elements <= int.max && elements <= maxDoubles, "ISRES population workspace is too large");
+            break;
+        case c.NLOPT_GN_ESCH:
+            // esch.c combines parents and offspring, indexes offspring as
+            // int, and multiplies offspring by dimension in unsigned int.
+            struct Individual { double* parameters; double fitness; }
+            const offspring = 3UL * size / 2;
+            const total = size + offspring;
+            enforce(offspring <= int.max && total <= uint.max &&
+                    total <= size_t.max / Individual.sizeof && offspring * n <= uint.max &&
+                    n <= maxDoubles, "ESCH population workspace is too large");
+            break;
+        case c.NLOPT_G_MLSL, c.NLOPT_G_MLSL_LDS, c.NLOPT_GN_MLSL,
+             c.NLOPT_GN_MLSL_LDS, c.NLOPT_GD_MLSL, c.NLOPT_GD_MLSL_LDS:
+            enforce(10UL * n + size <= int.max, "MLSL sample count is too large");
+            break;
+        case c.NLOPT_GD_STOGO_RAND:
+            enforce(2UL * n + 1 <= int.max && size < int.max, "StoGO sample count is too large");
+            break;
+        default: break;
+    }
+}
+
+private void checkVectorStorage(c.nlopt_algorithm algorithm, uint n, uint count)
+{
+    import std.algorithm.comparison : max, min;
+    enforce(count <= int.max, "Vector storage exceeds the native integer range");
+    if (count == 0) return;
+    // The Luksan solvers each allocate one double workspace. Their linear
+    // terms and number of n-by-count blocks differ (plis.c, plip.c, pnet.c).
+    uint vectors, blocks;
+    switch (algorithm)
+    {
+        case c.NLOPT_LD_LBFGS:
+            vectors = 4; blocks = 2; break;
+        case c.NLOPT_LD_VAR1, c.NLOPT_LD_VAR2:
+            vectors = 7; blocks = 1; break;
+        case c.NLOPT_LD_TNEWTON, c.NLOPT_LD_TNEWTON_RESTART,
+             c.NLOPT_LD_TNEWTON_PRECOND, c.NLOPT_LD_TNEWTON_PRECOND_RESTART:
+            vectors = 9; blocks = 2; break;
+        default: return;
+    }
+    enum limit = min(ulong(int.max), ulong(size_t.max / double.sizeof));
+    const fixed = ulong(vectors) * n + 2UL * max(n, count);
+    enforce(fixed <= limit && ulong(n) * count <= (limit - fixed) / blocks,
+            "Limited-memory solver workspace is too large");
+}
+
 private struct ResidualGroups
 {
     uint total;
@@ -535,6 +604,110 @@ struct Optimizer
         assert(readSteps() == [0.25, -2]);
         opt.resetInitialStep();
         assert(readSteps() == automatic);
+    }
+
+    /** Set the population size for algorithms such as CRS2 and ISRES.
+        Params:
+            size = Number of candidate points. Zero selects NLopt's default.
+                An explicit size must fit the chosen algorithm's population
+                and workspace limits.
+        Throws: Exception for an unsupported population size or workspace, an inactive owner,
+            an active solve or native failure.
+    */
+    void setPopulation(uint size)
+    {
+        auto s = idle();
+        checkPopulation(s.solver.algorithm, c.nlopt_get_dimension(s.handle), size);
+        s.check(c.nlopt_set_population(s.handle, size));
+    }
+
+    unittest
+    {
+        import std.exception : assertThrown;
+        auto opt = Optimizer(c.NLOPT_GN_CRS2_LM, 2);
+        opt.setPopulation(40);
+        assertThrown(opt.setPopulation(2));
+        assertThrown(opt.setPopulation(uint.max));
+        assert(c.nlopt_get_population(opt.state.handle) == 40);
+        opt.setPopulation(0);
+        assert(c.nlopt_get_population(opt.state.handle) == 0);
+    }
+
+    unittest
+    {
+        import std.algorithm.comparison : min;
+        import std.exception : assertThrown;
+        enum uint n = 8;
+        enum ulong maxDoubles = size_t.max / double.sizeof;
+        enum limit = min(ulong(int.max), maxDoubles);
+        void checkBoundary(c.nlopt_algorithm algorithm, uint last)
+        {
+            auto opt = Optimizer(algorithm, n);
+            opt.setPopulation(last);
+            assertThrown(opt.setPopulation(last + 1));
+            assert(c.nlopt_get_population(opt.state.handle) == last);
+        }
+        checkBoundary(c.NLOPT_GN_CRS2_LM,
+                cast(uint)min(int.max / (n + 1), maxDoubles / (n + 1) - 1));
+        checkBoundary(c.NLOPT_GN_ISRES, cast(uint)((limit - n) / (2 * (n + 1))));
+        checkBoundary(c.NLOPT_G_MLSL_LDS, int.max - 10 * n);
+        checkBoundary(c.NLOPT_GD_STOGO_RAND, int.max - 1);
+        // At this dimension the unsigned offspring-by-dimension product
+        // is the first ESCH limit on both 32-bit and 64-bit targets.
+        enum uint eschDimension = 128;
+        enum uint maxOffspring = uint.max / eschDimension;
+        enum uint lastParents = (2 * maxOffspring + 1) / 3;
+        auto esch = Optimizer(c.NLOPT_GN_ESCH, eschDimension);
+        esch.setPopulation(lastParents);
+        assertThrown(esch.setPopulation(lastParents + 1));
+        assert(c.nlopt_get_population(esch.state.handle) == lastParents);
+    }
+
+    /** Set the history length for limited-memory quasi-Newton algorithms.
+        Params:
+            count = Number of previous updates to retain, for example in L-BFGS.
+                Zero selects NLopt's default. An explicit count must fit the
+                chosen algorithm's workspace for the problem dimension.
+        Throws: Exception for an unsupported count or workspace, an inactive owner,
+            an active solve or native failure.
+    */
+    void setVectorStorage(uint count)
+    {
+        auto s = idle();
+        checkVectorStorage(s.solver.algorithm, c.nlopt_get_dimension(s.handle), count);
+        s.check(c.nlopt_set_vector_storage(s.handle, count));
+    }
+
+    unittest
+    {
+        import std.exception : assertThrown;
+        auto opt = Optimizer(Algorithm.ldLBFGS, 2);
+        opt.setVectorStorage(5);
+        assertThrown(opt.setVectorStorage(uint.max));
+        assert(c.nlopt_get_vector_storage(opt.state.handle) == 5);
+        opt.setVectorStorage(0);
+        assert(c.nlopt_get_vector_storage(opt.state.handle) == 0);
+    }
+
+    unittest
+    {
+        import std.algorithm.comparison : min;
+        import std.exception : assertThrown;
+        enum uint n = 4;
+        enum limit = min(ulong(int.max), ulong(size_t.max / double.sizeof));
+        void checkBoundary(c.nlopt_algorithm algorithm, uint last)
+        {
+            auto opt = Optimizer(algorithm, n);
+            opt.setVectorStorage(last);
+            assertThrown(opt.setVectorStorage(last + 1));
+            assert(c.nlopt_get_vector_storage(opt.state.handle) == last);
+        }
+        checkBoundary(c.NLOPT_LD_LBFGS, cast(uint)((limit - 4 * n) / (2 * n + 2)));
+        foreach (algorithm; [c.NLOPT_LD_VAR1, c.NLOPT_LD_VAR2])
+            checkBoundary(algorithm, cast(uint)((limit - 7 * n) / (n + 2)));
+        foreach (algorithm; [c.NLOPT_LD_TNEWTON, c.NLOPT_LD_TNEWTON_RESTART,
+                c.NLOPT_LD_TNEWTON_PRECOND, c.NLOPT_LD_TNEWTON_PRECOND_RESTART])
+            checkBoundary(algorithm, cast(uint)((limit - 9 * n) / (2 * n + 2)));
     }
 
     private void addConstraint(alias register)(Objective constraint, double tolerance)
