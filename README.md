@@ -1,6 +1,6 @@
 # nloptd
 
-A D interface to the native NLopt optimization library. The development API provides a move-only optimizer, scalar minimization with D functions and captured delegates, and in-place results. Import `nloptd.raw` for the full C API from your installed `nlopt.h`.
+A D interface to the native NLopt optimization library. The development API provides a move-only optimizer, scalar minimization and maximization with D functions and captured delegates, and in-place results. Import `nloptd.raw` for the full C API from your installed `nlopt.h`.
 
 ## Build and run
 
@@ -72,9 +72,30 @@ A local optimizer releases its native handle at scope exit. If the owner is dest
 
 ## Stopping criteria
 
-Choose criteria in the units of the problem. For minimization, `setStopValue(target)` sets a target objective value. `setFTolAbs` and `setFTolRel` set tolerances on changes in the objective. `setXTolAbs` accepts either a uniform absolute tolerance or one per coordinate. For example, `opt.setXTolAbs([1e-4, 1e-8])` gives a two-dimensional problem different absolute tolerances for its two coordinates. Use `setXTolRel` for a relative coordinate tolerance.
+Choose criteria in the units of the problem. With `setStopValue(target)`, minimization seeks an objective value below the target and maximization seeks one above it. Whether exact equality triggers `Termination.stopValueReached` depends on the algorithm. A finite target stays in effect when you switch objective direction.
+
+`setFTolAbs` and `setFTolRel` set tolerances on changes in the objective. `setXTolAbs` accepts either a uniform absolute tolerance or one per coordinate. For example, `opt.setXTolAbs([1e-4, 1e-8])` gives a two-dimensional problem different absolute tolerances for its two coordinates. Use `setXTolRel` for a relative coordinate tolerance.
 
 Use `setMaxEvaluations` to limit objective evaluations or `setMaxTime` for an approximate time limit in seconds. An evaluation in progress can run past the time limit. Check `result.termination` to see which criterion ended the run.
+
+## Maximization
+
+Use `setMaxObjective` with the value and derivatives of the function you want to maximize. This quadratic peaks at `x = 3`, where the returned objective value is 7.
+
+```d
+import nloptd;
+
+auto opt = Optimizer(Algorithm.ldSLSQP, 1);
+opt.setMaxObjective((x, gradient) {
+    const delta = x[0] - 3;
+    if (gradient.length) gradient[0] = -2 * delta;
+    return 7 - delta * delta;
+});
+opt.setXTolRel(1e-9);
+opt.setMaxEvaluations(100);
+double[1] point = [0];
+auto result = opt.optimizeInPlace(point[]);
+```
 
 ## Scalar nonlinear constraints
 
