@@ -26,6 +26,23 @@ private double sphere(scope const(double)[] x, scope double[] gradient)
     return x[0] * x[0];
 }
 
+private void testInitialStep()
+{
+    auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+    opt.setMinObjective((x, grad) {
+        const a = x[0] - 0.5;
+        const b = (x[1] - 100) / 100;
+        return a * a + b * b;
+    });
+    opt.setInitialStep([0.1, 20.0]);
+    opt.setXTolAbs([1e-8, 1e-6]);
+    opt.setMaxEvaluations(500);
+    double[2] point = [0, 0];
+    auto result = opt.optimizeInPlace(point[]);
+    assert(abs(point[0] - 0.5) < 1e-6 && abs(point[1] - 100) < 1e-4);
+    assert(result.value < 1e-10);
+}
+
 private void testBounds()
 {
     auto opt = Optimizer(Algorithm.ldSLSQP, 2);
@@ -315,6 +332,7 @@ void main()
     testVectorEquality();
     testVectorInequality();
     testBounds();
+    testInitialStep();
     testMmaTutorial();
     testEquality();
     testConstraintException();

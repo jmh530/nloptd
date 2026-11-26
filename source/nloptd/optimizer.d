@@ -476,6 +476,67 @@ struct Optimizer
         s.check(c.nlopt_set_upper_bounds(s.handle, bounds.ptr));
     }
 
+    /** Set a uniform initial step for algorithms such as Nelder-Mead.
+        Params:
+            step = Nonzero signed step in coordinate units, used for every dimension.
+        Throws: Exception for an inactive owner, active solve, zero step or native failure.
+    */
+    void setInitialStep(double step)
+    {
+        auto s = idle();
+        s.check(c.nlopt_set_initial_step1(s.handle, step));
+    }
+
+    /** Set an initial step for each coordinate.
+        Params:
+            steps = One nonzero signed step per dimension, in coordinate order.
+                NLopt copies these values during registration.
+        Throws: Exception for a dimension mismatch, inactive owner, active solve,
+            zero step or native failure.
+    */
+    void setInitialStep(scope const(double)[] steps)
+    {
+        auto s = idle();
+        enforce(steps.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
+        s.check(c.nlopt_set_initial_step(s.handle, steps.ptr));
+    }
+
+    /** Restore automatic initial steps based on the starting point and bounds.
+        Throws: Exception for an inactive owner, active solve or native failure.
+    */
+    void resetInitialStep()
+    {
+        auto s = idle();
+        s.check(c.nlopt_set_initial_step(s.handle, null));
+    }
+
+    unittest
+    {
+        import std.exception : assertThrown;
+        auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+        double[2] point = [3, 5];
+        double[2] readSteps()
+        {
+            double[2] steps;
+            opt.state.check(c.nlopt_get_initial_step(opt.state.handle, point.ptr, steps.ptr));
+            return steps;
+        }
+
+        const automatic = readSteps();
+        opt.setInitialStep(-0.5);
+        assert(readSteps() == [-0.5, -0.5]);
+        double[2] steps = [0.25, -2];
+        opt.setInitialStep(steps[]);
+        steps[] = 0;
+        assertThrown(opt.setInitialStep(null));
+        assertThrown(opt.setInitialStep(steps[0 .. 1]));
+        assertThrown!NloptException(opt.setInitialStep(0.0));
+        assertThrown!NloptException(opt.setInitialStep([1.0, 0.0]));
+        assert(readSteps() == [0.25, -2]);
+        opt.resetInitialStep();
+        assert(readSteps() == automatic);
+    }
+
     private void addConstraint(alias register)(Objective constraint, double tolerance)
     {
         auto s = idle();
