@@ -60,6 +60,42 @@ private void testBounds()
     assert(abs(result.value - 2) < 1e-6);
 }
 
+private void testMaxObjective()
+{
+    auto opt = Optimizer(Algorithm.ldSLSQP, 1);
+    double center = 3;
+    opt.setMaxObjective((x, grad) {
+        const delta = x[0] - center;
+        if (grad.length) grad[0] = -2 * delta;
+        return 7 - delta * delta;
+    });
+    opt.setXTolRel(1e-9);
+    opt.setMaxEvaluations(100);
+    double[1] point = [0];
+    auto result = opt.optimizeInPlace(point[]);
+    assert(abs(point[0] - center) < 1e-6 && abs(result.value - 7) < 1e-9);
+
+    opt.setStopValue(6);
+    point[0] = 0;
+    result = opt.optimizeInPlace(point[]);
+    assert(result.termination == Termination.stopValueReached && result.value >= 6);
+
+    auto bounded = Optimizer(Algorithm.lnNelderMead, 1);
+    bounded.setLowerBounds(0.0);
+    bounded.setUpperBounds(2.0);
+    bounded.setXTolAbs(1e-8);
+    bounded.setMaxEvaluations(200);
+    bounded.setMinObjective(&sphere);
+    point[0] = 1;
+    assert(abs(bounded.optimizeInPlace(point[]).value) < 1e-8);
+    bounded.setMaxObjective(&sphere);
+    point[0] = 1;
+    assert(abs(bounded.optimizeInPlace(point[]).value - 4) < 1e-6);
+    bounded.setMinObjective(&sphere);
+    point[0] = 1;
+    assert(abs(bounded.optimizeInPlace(point[]).value) < 1e-8);
+}
+
 private Objective cubicConstraint(double a, double b)
 {
     return (x, gradient) {
@@ -270,6 +306,7 @@ private void testLocalOptimizer()
 
 void main()
 {
+    testMaxObjective();
     testLocalOptimizer();
     testDualSolverReplacement();
     testNestedAuglagWorkspace();

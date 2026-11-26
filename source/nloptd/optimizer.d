@@ -375,6 +375,14 @@ struct Optimizer
         return state;
     }
 
+    private void setObjective(alias register)(Objective objective)
+    {
+        auto s = idle();
+        enforce(objective !is null, "Missing objective");
+        s.check(register(s.handle, &evaluate, &s.objective));
+        s.objective = ScalarCallback(s, objective);
+    }
+
     /** Register or replace the scalar objective to minimize.
         Params:
             objective = Retained delegate. Both slices are valid during the call.
@@ -382,10 +390,7 @@ struct Optimizer
     */
     void setMinObjective(Objective objective)
     {
-        auto s = idle();
-        enforce(objective !is null, "Missing objective");
-        s.check(c.nlopt_set_min_objective(s.handle, &evaluate, &s.objective));
-        s.objective = ScalarCallback(s, objective);
+        setObjective!(c.nlopt_set_min_objective)(objective);
     }
 
     /** Register a D function to minimize.
@@ -398,6 +403,31 @@ struct Optimizer
         import std.functional : toDelegate;
         enforce(objective !is null, "Missing objective");
         setMinObjective(toDelegate(objective));
+    }
+
+    /** Register or replace the scalar objective to maximize.
+        Params:
+            objective = Retained delegate returning the value to maximize. Both
+                slices are borrowed for the call. When the gradient is nonempty,
+                fill it with the derivatives of the returned value.
+        Throws: Exception for a null objective, inactive owner, active solve or native failure.
+    */
+    void setMaxObjective(Objective objective)
+    {
+        setObjective!(c.nlopt_set_max_objective)(objective);
+    }
+
+    /** Register a D function to maximize.
+        Params:
+            objective = Function with the same borrowed slice and gradient contract
+                as the delegate overload.
+        Throws: Exception under the same conditions as the delegate overload.
+    */
+    void setMaxObjective(double function(scope const(double)[], scope double[]) objective)
+    {
+        import std.functional : toDelegate;
+        enforce(objective !is null, "Missing objective");
+        setMaxObjective(toDelegate(objective));
     }
 
     /** Set the same lower bound on every coordinate.
@@ -639,9 +669,13 @@ struct Optimizer
         parent.state.solver.checkWorkspace(1, ConstraintSizes.init, true);
     }
 
-    /** Set the target objective value for minimization.
+    /** Set the target objective value.
         Params:
-            value = Stop when the objective reaches this value or lower. Negative infinity disables the target.
+            value = Objective threshold. Minimization seeks a value below it and
+                maximization seeks a value above it. Whether equality triggers
+                $(D Termination.stopValueReached) depends on the algorithm.
+                Disable the target with negative infinity for minimization or
+                positive infinity for maximization.
         Throws: Exception for an inactive owner, active solve or native failure.
     */
     void setStopValue(double value)
@@ -774,7 +808,7 @@ struct Optimizer
         state.check(c.nlopt_force_stop(state.handle));
     }
 
-    /** Minimize the registered objective in place.
+    /** Optimize the registered objective in place.
         Params:
             point = Initial coordinates, overwritten with the native final point.
                 Its length must equal the optimizer dimension.
