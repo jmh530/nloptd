@@ -321,6 +321,48 @@ private void testLocalOptimizer()
     assert(incomplete.optimizeInPlace(point[]).value <= 0.01);
 }
 
+private void testRemoveConstraints()
+{
+    auto opt = Optimizer(Algorithm.ldSLSQP, 2);
+    opt.setMinObjective((x, grad) {
+        if (grad.length)
+        {
+            grad[0] = 2 * x[0];
+            grad[1] = 2 * x[1];
+        }
+        return x[0] * x[0] + x[1] * x[1];
+    });
+    opt.setXTolAbs(1e-9);
+    opt.setMaxEvaluations(100);
+    Objective equality = (x, grad) {
+        if (grad.length) grad[] = [1.0, 0];
+        return x[0] - 2;
+    };
+    VectorConstraint inequality = (values, x, grad) {
+        if (grad.length) grad[] = [0.0, -1];
+        values[0] = 1 - x[1];
+    };
+    void checkMinimum(double x, double y)
+    {
+        double[2] point = [3, 3];
+        opt.optimizeInPlace(point[]);
+        assert(abs(point[0] - x) < 1e-6 && abs(point[1] - y) < 1e-6);
+    }
+
+    opt.addEqualityConstraint(equality);
+    opt.addInequalityMConstraint(inequality, [1e-9]);
+    checkMinimum(2, 1);
+    opt.removeEqualityConstraints();
+    opt.removeEqualityConstraints();
+    checkMinimum(0, 1);
+    opt.addEqualityConstraint(equality);
+    opt.removeInequalityConstraints();
+    opt.removeInequalityConstraints();
+    checkMinimum(2, 0);
+    opt.addInequalityMConstraint(inequality, [1e-9]);
+    checkMinimum(2, 1);
+}
+
 void main()
 {
     testMaxObjective();
@@ -330,6 +372,7 @@ void main()
     testStoppingCriteria();
     testMmaWorkspaceLimit();
     testVectorEquality();
+    testRemoveConstraints();
     testVectorInequality();
     testBounds();
     testInitialStep();

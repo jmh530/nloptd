@@ -131,6 +131,8 @@ Constraints follow the objective's slice lifetime and exception rules. Each regi
 
 ## Vector-valued nonlinear constraints
 
+To reuse an optimizer with a different constraint set, call `removeEqualityConstraints()` or `removeInequalityConstraints()` between solves. Each method clears both scalar and vector callbacks of that kind and releases the wrapper's references to them. You can then add fresh constraints. Repeated removal is allowed.
+
 Use `addEqualityMConstraint` or `addInequalityMConstraint` to evaluate several residuals at the same point. Supply one nonnegative absolute feasibility tolerance per residual. NLopt copies these tolerances at registration. An empty tolerance slice registers no constraints.
 
 For MMA and CCSAQ, NLopt 2.11.0 calculates its workspace size using unsigned integer arithmetic. The wrapper checks the dimension at construction and the total number of residuals across scalar and vector registrations before adding a constraint.
