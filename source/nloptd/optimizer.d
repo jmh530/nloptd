@@ -12,6 +12,7 @@ enum Algorithm
     ldLBFGS = c.NLOPT_LD_LBFGS,
     ldMMA = c.NLOPT_LD_MMA,
     ldSLSQP = c.NLOPT_LD_SLSQP,
+    auglag = c.NLOPT_AUGLAG,
 }
 
 /// Reason optimization ended. A limit or interruption can leave a partial result.
@@ -142,6 +143,100 @@ unittest
     assert(6UL * n + 2UL * (m + 1) * n + 7UL * (m + 1) > limit);
 }
 
+private struct ResidualGroups
+{
+    uint total;
+    uint largest;
+}
+
+private struct ConstraintSizes
+{
+    ResidualGroups inequalities, equalities;
+
+    ConstraintSizes adding(bool inequality, uint count) const
+    {
+        import std.algorithm.comparison : max;
+        ConstraintSizes result = this;
+        auto group = inequality ? &result.inequalities : &result.equalities;
+        enforce(count <= uint.max - group.total, "Too many constraint residuals");
+        group.total += count;
+        group.largest = max(group.largest, count);
+        return result;
+    }
+}
+
+// Mirrors only the native algorithm choices. A subsidiary copy carries no
+// registered residuals or D callbacks from its original optimizer.
+private struct SolverConfig
+{
+    c.nlopt_algorithm algorithm;
+    const(SolverConfig)* local;
+
+    private bool forwardsInequalities() const
+    {
+        return algorithm == c.NLOPT_AUGLAG_EQ || algorithm == c.NLOPT_LD_AUGLAG_EQ ||
+                algorithm == c.NLOPT_LN_AUGLAG_EQ;
+    }
+
+    private bool isAuglag() const
+    {
+        return forwardsInequalities || algorithm == c.NLOPT_AUGLAG ||
+                algorithm == c.NLOPT_LD_AUGLAG || algorithm == c.NLOPT_LN_AUGLAG;
+    }
+
+    void checkWorkspace(uint n, ConstraintSizes sizes, bool requireLocal = false) const
+    {
+        import std.algorithm.comparison : max, min;
+        if (algorithm == c.NLOPT_LD_MMA || algorithm == c.NLOPT_LD_CCSAQ)
+        {
+            enforce(local is null || !local.isAuglag,
+                    "MMA and CCSAQ cannot use AUGLAG as their dual solver");
+            enforce(sizes.inequalities.total <= mmaResidualCapacity(n),
+                    "Too many residuals for the MMA/CCSAQ workspace");
+            return;
+        }
+        if (!isAuglag) return;
+        const forward = forwardsInequalities;
+
+        // auglag.c uses signed int for n, residual totals, and the workspace
+        // expression n + largest * (1 + n) + equalityTotal + inequalityTotal.
+        enforce(n < int.max, "AUGLAG workspace dimension is too large");
+        const handled = forward ? ResidualGroups.init : sizes.inequalities;
+        const largest = max(handled.largest, sizes.equalities.largest);
+        const elements = n + (1UL + n) * largest + sizes.equalities.total + handled.total;
+        enum limit = min(ulong(int.max), ulong(size_t.max / double.sizeof));
+        enforce(elements <= limit, "AUGLAG workspace is too large");
+
+        ConstraintSizes subsidiary;
+        if (forward) subsidiary.inequalities = sizes.inequalities;
+        if (local)
+            local.checkWorkspace(n, subsidiary, true);
+        else
+            enforce(!requireLocal, "Configure the AUGLAG local solver with setLocalOptimizer");
+    }
+}
+
+unittest
+{
+    import std.exception : assertThrown;
+    enum ulong limit = size_t.sizeof == 4 ? size_t.max / double.sizeof : int.max;
+    enum uint n = 32_768;
+    enum uint largest = cast(uint)((limit - n) / (n + 2));
+    enum uint total = cast(uint)(limit - n - largest * (1UL + n));
+    auto all = SolverConfig(c.NLOPT_AUGLAG);
+    auto eqOnly = SolverConfig(c.NLOPT_AUGLAG_EQ);
+    ConstraintSizes sizes;
+    sizes.equalities = ResidualGroups(total, largest);
+    all.checkWorkspace(n, sizes);
+    eqOnly.checkWorkspace(n, sizes);
+    assertThrown(all.checkWorkspace(n, sizes.adding(false, 1)));
+    assertThrown(eqOnly.checkWorkspace(n, sizes.adding(false, 1)));
+    sizes = sizes.adding(true, 1);
+    assertThrown(all.checkWorkspace(n, sizes));
+    eqOnly.checkWorkspace(n, sizes);
+    assertThrown(all.checkWorkspace(int.max, ConstraintSizes.init));
+}
+
 private struct State
 {
     // Borrowed from NativeOwner for configuration and callback dispatch.
@@ -151,13 +246,15 @@ private struct State
     VectorCallback* vectorConstraints;
     Throwable pending;
     bool running;
-    uint remainingMmaResiduals = uint.max; // Sentinel for other algorithms.
+    SolverConfig solver;
+    ConstraintSizes sizes;
 
-    uint remainingAfterAdding(uint count) const
+    void finishLocalReplacement(c.nlopt_result code, SolverConfig replacement)
     {
-        if (remainingMmaResiduals == uint.max) return uint.max;
-        enforce(count <= remainingMmaResiduals, "Too many residuals for the MMA/CCSAQ workspace");
-        return remainingMmaResiduals - count;
+        // NLopt destroys the old subsidiary before allocating its replacement.
+        if (code == c.NLOPT_OUT_OF_MEMORY) solver.local = null;
+        check(code);
+        solver = replacement;
     }
 
     void check(c.nlopt_result code)
@@ -239,8 +336,8 @@ struct Optimizer
     {
         enforce(dimension > 0, "NLopt requires a positive dimension");
         state = new State;
-        if (algorithm == c.NLOPT_LD_MMA || algorithm == c.NLOPT_LD_CCSAQ)
-            state.remainingMmaResiduals = mmaResidualCapacity(dimension);
+        state.solver = SolverConfig(algorithm);
+        state.solver.checkWorkspace(dimension, state.sizes);
         owner = NativeOwner.create(algorithm, dimension);
         state.handle = owner.handle;
     }
@@ -354,10 +451,11 @@ struct Optimizer
         auto s = idle();
         enforce(constraint !is null, "Missing constraint");
         enforce(tolerance >= 0, "Constraint tolerance must be nonnegative");
-        const remaining = s.remainingAfterAdding(1);
+        auto sizes = s.sizes.adding(__traits(isSame, register, c.nlopt_add_inequality_constraint), 1);
+        s.solver.checkWorkspace(c.nlopt_get_dimension(s.handle), sizes);
         auto callback = new ScalarCallback(s, constraint, s.constraints);
         s.check(register(s.handle, &evaluate, callback, tolerance));
-        s.remainingMmaResiduals = remaining;
+        s.sizes = sizes;
         s.constraints = callback;
     }
 
@@ -422,14 +520,15 @@ struct Optimizer
         if (!tolerances.length) return;
         enforce(tolerances.length <= uint.max, "Too many constraint residuals");
         const count = cast(uint) tolerances.length;
-        const remaining = s.remainingAfterAdding(count);
+        auto sizes = s.sizes.adding(__traits(isSame, register, c.nlopt_add_inequality_mconstraint), count);
+        s.solver.checkWorkspace(c.nlopt_get_dimension(s.handle), sizes);
         enforce(tolerances.length <= size_t.max / double.sizeof / c.nlopt_get_dimension(s.handle),
                 "Constraint gradient is too large");
         foreach (tolerance; tolerances)
             enforce(tolerance >= 0, "Constraint tolerance must be nonnegative");
         auto callback = new VectorCallback(s, constraint, s.vectorConstraints);
         s.check(register(s.handle, count, &evaluateVector, callback, tolerances.ptr));
-        s.remainingMmaResiduals = remaining;
+        s.sizes = sizes;
         s.vectorConstraints = callback;
     }
 
@@ -487,6 +586,57 @@ struct Optimizer
         import std.functional : toDelegate;
         enforce(constraint !is null, "Missing constraint");
         addEqualityMConstraint(toDelegate(constraint), tolerances);
+    }
+
+    /** Configure the subsidiary solver for an algorithm that uses local optimization.
+        NLopt copies the local algorithm and its settings. The parent supplies the
+        objective, bounds and constraints when it runs.
+        Params:
+            local = A distinct, idle optimizer of the same dimension. It can be
+                reconfigured or destroyed after this call. An AUGLAG subsidiary
+                must already have its own local solver. MMA and CCSAQ reject
+                AUGLAG subsidiaries because NLopt discards their nested solver.
+        Throws: Exception for an inactive or running optimizer, self-registration,
+            missing AUGLAG local solver, AUGLAG dual solver for MMA or CCSAQ,
+            incompatible dimensions or workspace size, or native failure.
+    */
+    void setLocalOptimizer(ref Optimizer local)
+    {
+        auto s = idle();
+        auto source = local.idle();
+        enforce(s !is source, "Optimizer cannot be its own local solver");
+        source.solver.checkWorkspace(c.nlopt_get_dimension(source.handle), ConstraintSizes.init, true);
+        auto replacement = SolverConfig(s.solver.algorithm,
+                new SolverConfig(source.solver.algorithm, source.solver.local));
+        const dimension = c.nlopt_get_dimension(s.handle);
+        if (dimension == c.nlopt_get_dimension(source.handle))
+            replacement.checkWorkspace(dimension, s.sizes);
+        s.finishLocalReplacement(c.nlopt_set_local_optimizer(s.handle, source.handle), replacement);
+    }
+
+    ///
+    unittest
+    {
+        auto opt = Optimizer(Algorithm.auglag, 1);
+        auto local = Optimizer(Algorithm.ldSLSQP, 1);
+        local.setXTolRel(1e-9);
+        opt.setLocalOptimizer(local);
+    }
+
+    unittest
+    {
+        import std.exception : assertThrown;
+        auto parent = Optimizer(c.NLOPT_LD_AUGLAG_EQ, 1);
+        auto local = Optimizer(Algorithm.ldSLSQP, 1);
+        parent.setLocalOptimizer(local);
+        // Model the native postcondition of a failed copy without exhausting memory.
+        parent.state.check(c.nlopt_set_local_optimizer(parent.state.handle, null));
+        assertThrown!NloptException(parent.state.finishLocalReplacement(c.NLOPT_OUT_OF_MEMORY, local.state.solver));
+        assert(parent.state.solver.local is null);
+        assert(parent.state.solver.algorithm == c.NLOPT_LD_AUGLAG_EQ);
+        assertThrown(parent.state.solver.checkWorkspace(1, ConstraintSizes.init, true));
+        parent.setLocalOptimizer(local);
+        parent.state.solver.checkWorkspace(1, ConstraintSizes.init, true);
     }
 
     /** Set the target objective value for minimization.
@@ -631,13 +781,15 @@ struct Optimizer
         Returns: Value, termination reason and evaluation count from this run.
             Interrupted runs may return a partial point.
         Throws: The original callback throwable, NloptException on native failure,
-            or Exception for invalid wrapper state or dimension.
+            or Exception for invalid wrapper state or dimension, including an AUGLAG
+            optimizer without an explicit local solver.
     */
     OptimizationResult optimizeInPlace(scope double[] point)
     {
         auto s = idle();
         enforce(s.objective.callable !is null, "Missing objective");
         enforce(point.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
+        s.solver.checkWorkspace(c.nlopt_get_dimension(s.handle), s.sizes, true);
         auto activeOwner = owner;
         activeOwner.retain();
         scope(exit) activeOwner.release();
