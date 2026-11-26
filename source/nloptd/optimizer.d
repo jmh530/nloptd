@@ -306,13 +306,18 @@ unittest
     assertThrown(all.checkWorkspace(int.max, ConstraintSizes.init));
 }
 
+private struct ConstraintCallbacks
+{
+    ScalarCallback* scalar;
+    VectorCallback* vector;
+}
+
 private struct State
 {
     // Borrowed from NativeOwner for configuration and callback dispatch.
     c.nlopt_opt handle;
     ScalarCallback objective;
-    ScalarCallback* constraints;
-    VectorCallback* vectorConstraints;
+    ConstraintCallbacks inequalities, equalities;
     Throwable pending;
     bool running;
     SolverConfig solver;
@@ -715,12 +720,14 @@ struct Optimizer
         auto s = idle();
         enforce(constraint !is null, "Missing constraint");
         enforce(tolerance >= 0, "Constraint tolerance must be nonnegative");
-        auto sizes = s.sizes.adding(__traits(isSame, register, c.nlopt_add_inequality_constraint), 1);
+        enum inequality = __traits(isSame, register, c.nlopt_add_inequality_constraint);
+        auto callbacks = inequality ? &s.inequalities : &s.equalities;
+        auto sizes = s.sizes.adding(inequality, 1);
         s.solver.checkWorkspace(c.nlopt_get_dimension(s.handle), sizes);
-        auto callback = new ScalarCallback(s, constraint, s.constraints);
+        auto callback = new ScalarCallback(s, constraint, callbacks.scalar);
         s.check(register(s.handle, &evaluate, callback, tolerance));
         s.sizes = sizes;
-        s.constraints = callback;
+        callbacks.scalar = callback;
     }
 
     /** Add a scalar inequality constraint $(I c(x) ≤ 0).
@@ -784,16 +791,18 @@ struct Optimizer
         if (!tolerances.length) return;
         enforce(tolerances.length <= uint.max, "Too many constraint residuals");
         const count = cast(uint) tolerances.length;
-        auto sizes = s.sizes.adding(__traits(isSame, register, c.nlopt_add_inequality_mconstraint), count);
+        enum inequality = __traits(isSame, register, c.nlopt_add_inequality_mconstraint);
+        auto callbacks = inequality ? &s.inequalities : &s.equalities;
+        auto sizes = s.sizes.adding(inequality, count);
         s.solver.checkWorkspace(c.nlopt_get_dimension(s.handle), sizes);
         enforce(tolerances.length <= size_t.max / double.sizeof / c.nlopt_get_dimension(s.handle),
                 "Constraint gradient is too large");
         foreach (tolerance; tolerances)
             enforce(tolerance >= 0, "Constraint tolerance must be nonnegative");
-        auto callback = new VectorCallback(s, constraint, s.vectorConstraints);
+        auto callback = new VectorCallback(s, constraint, callbacks.vector);
         s.check(register(s.handle, count, &evaluateVector, callback, tolerances.ptr));
         s.sizes = sizes;
-        s.vectorConstraints = callback;
+        callbacks.vector = callback;
     }
 
     /** Register a vector of inequality constraints, one per tolerance.
@@ -850,6 +859,51 @@ struct Optimizer
         import std.functional : toDelegate;
         enforce(constraint !is null, "Missing constraint");
         addEqualityMConstraint(toDelegate(constraint), tolerances);
+    }
+
+    /** Remove all scalar and vector inequality constraints from this optimizer.
+        Calling this with no registered inequalities succeeds.
+        Throws: Exception for an inactive owner, active solve or native failure.
+    */
+    void removeInequalityConstraints()
+    {
+        auto s = idle();
+        s.check(c.nlopt_remove_inequality_constraints(s.handle));
+        s.inequalities = ConstraintCallbacks.init;
+        s.sizes.inequalities = ResidualGroups.init;
+    }
+
+    /** Remove all scalar and vector equality constraints from this optimizer.
+        Calling this with no registered equalities succeeds.
+        Throws: Exception for an inactive owner, active solve or native failure.
+    */
+    void removeEqualityConstraints()
+    {
+        auto s = idle();
+        s.check(c.nlopt_remove_equality_constraints(s.handle));
+        s.equalities = ConstraintCallbacks.init;
+        s.sizes.equalities = ResidualGroups.init;
+    }
+
+    unittest
+    {
+        auto opt = Optimizer(Algorithm.ldSLSQP, 3);
+        Objective scalar = (x, gradient) => x[0];
+        VectorConstraint vector = (values, x, gradient) {};
+        opt.addEqualityConstraint(scalar);
+        opt.addInequalityMConstraint(vector, [0.0, 0.0]);
+        opt.addEqualityMConstraint(vector, [0.0, 0.0]);
+        opt.addInequalityConstraint(scalar);
+        const retained = opt.state.equalities;
+        assert(retained.scalar && retained.vector);
+        opt.removeInequalityConstraints();
+        assert(opt.state.inequalities == ConstraintCallbacks.init);
+        assert(opt.state.sizes.inequalities == ResidualGroups.init);
+        assert(opt.state.equalities == retained);
+        assert(opt.state.sizes.equalities == ResidualGroups(3, 2));
+        opt.removeEqualityConstraints();
+        assert(opt.state.equalities == ConstraintCallbacks.init);
+        assert(opt.state.sizes.equalities == ResidualGroups.init);
     }
 
     /** Configure the subsidiary solver for an algorithm that uses local optimization.
