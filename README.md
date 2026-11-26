@@ -74,6 +74,12 @@ A local optimizer releases its native handle at scope exit. If the owner is dest
 
 For Nelder–Mead, use `opt.setInitialStep(0.5)` to set the same initial step on every coordinate. When coordinates have different scales, use one signed, nonzero step per coordinate, for example `opt.setInitialStep([0.1, 20.0])`. NLopt copies the steps and keeps them across solves. Call `opt.resetInitialStep()` to let NLopt choose steps from the starting point and bounds again.
 
+## Population size and vector storage
+
+For a population-based algorithm such as CRS2, `opt.setPopulation(40)` requests a population of 40 candidate points. For a limited-memory quasi-Newton algorithm such as L-BFGS, `opt.setVectorStorage(5)` requests storage for five previous updates. A larger history uses more memory. Pass zero to either setter to restore NLopt's default for that setting.
+
+CRS2 needs at least one more candidate than the problem dimension. Both setters check explicit settings against the algorithm's native integer and workspace limits before replacing the current value. Available memory can still limit the solve.
+
 ## Stopping criteria
 
 Choose criteria in the units of the problem. With `setStopValue(target)`, minimization seeks an objective value below the target and maximization seeks one above it. Whether exact equality triggers `Termination.stopValueReached` depends on the algorithm. A finite target stays in effect when you switch objective direction.
