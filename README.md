@@ -2,6 +2,8 @@
 
 nloptd lets you minimize or maximize a function written in D using algorithms from [NLopt](https://github.com/stevengj/nlopt). Import `nloptd` for the D interface or `nloptd.raw` for the C API from your installed `nlopt.h`.
 
+The [NLopt D reference](docs/reference.md) covers optimizer construction, callbacks, constraints, stopping criteria, and results.
+
 Upgrading from 0.2.1? The [migration guide](MIGRATION.md) shows the same problem with the old and new APIs.
 
 ## A first solve
