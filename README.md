@@ -71,16 +71,13 @@ From the nloptd repository root, run `dub run --root=example`. To run the downst
 
 ### Use nloptd in your application
 
-To try the modern API from source, clone the nloptd repository beside your application directory. For an application named `my-app`, use the following minimal `my-app/dub.json`.
+From your DUB project directory, add nloptd from the registry:
 
-```json
-{
-    "name": "my-app",
-    "dependencies": { "nloptd": { "path": "../nloptd" } }
-}
+```sh
+dub add nloptd@0.3.0
 ```
 
-Save the first-solve example as `my-app/source/app.d` and run `dub run` from `my-app` with the environment settings above. Once version 0.3.0 is available on the DUB registry, new projects can add it with `dub add nloptd@0.3.0`.
+To try the [first solve](#a-first-solve) in a new DUB application, save the example as `source/app.d` and run `dub run` with the NLopt environment settings for your platform.
 
 <details>
 <summary>Experimental GDC 16 setup on Debian</summary>
