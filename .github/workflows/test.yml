@@ -45,6 +45,8 @@ jobs:
           dub test --compiler="$DC"
           dub run --root=tests/consumer --compiler="$DC"
           dub run --root=example --compiler="$DC"
+      - if: matrix.os == 'ubuntu-24.04' && matrix.compiler == 'ldc-1.43.0'
+        run: dub run --root=example/mir --compiler="$DC"
 
   gdc:
     runs-on: ubuntu-24.04
