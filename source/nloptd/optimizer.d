@@ -1090,6 +1090,68 @@ struct Optimizer
         s.check(c.nlopt_set_xtol_rel(s.handle, tolerance));
     }
 
+    /** Set a uniform weight for algorithms that use the weighted relative-change test.
+        Pass one to restore unit weights after setting individual weights.
+        Params:
+            weight = Nonnegative finite weight for every variable. The default is one.
+        Throws: Exception for an invalid weight, inactive owner, active solve or native failure.
+    */
+    void setXWeights(double weight)
+    {
+        import std.math : isFinite;
+        auto s = idle();
+        enforce(weight >= 0 && isFinite(weight), "Weights must be finite and nonnegative");
+        s.check(c.nlopt_set_x_weights1(s.handle, weight));
+    }
+
+    /** Set individual weights for algorithms that use the weighted relative-change test.
+        In NLopt 2.11.0, COBYLA and BOBYQA ignore these weights. Algorithms such
+        as Nelder-Mead remove fixed variables but retain the original weight order.
+        For nonuniform weights in that case, optimize only the free variables and
+        supply their weights in the same order.
+        Params:
+            weights = One nonnegative finite weight per variable, copied by NLopt.
+                A zero weight omits that variable from the weighted norm.
+        Throws: Exception for a dimension mismatch, invalid weight, inactive owner,
+            active solve or native failure.
+    */
+    void setXWeights(scope const(double)[] weights)
+    {
+        import std.math : isFinite;
+        auto s = idle();
+        enforce(weights.length == s.dimension, "Dimension mismatch");
+        foreach (weight; weights)
+            enforce(weight >= 0 && isFinite(weight), "Weights must be finite and nonnegative");
+        s.check(c.nlopt_set_x_weights(s.handle, weights.ptr));
+    }
+
+    ///
+    unittest
+    {
+        auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+        opt.setXTolRel(1e-8);
+        opt.setXWeights([1.0, 0.01]);
+    }
+
+    unittest
+    {
+        import std.exception : assertThrown;
+        auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+        double[2] actual;
+        opt.setXWeights(2.0);
+        opt.state.check(c.nlopt_get_x_weights(opt.state.handle, actual.ptr));
+        assert(actual == [2.0, 2.0]);
+
+        double[2] weights = [0, 0.5];
+        opt.setXWeights(weights[]);
+        weights[] = 1;
+        assertThrown(opt.setXWeights(weights[0 .. 1]));
+        assertThrown(opt.setXWeights([-1.0, 1.0]));
+        assertThrown(opt.setXWeights(double.nan));
+        opt.state.check(c.nlopt_get_x_weights(opt.state.handle, actual.ptr));
+        assert(actual == [0.0, 0.5]);
+    }
+
     /** Set the same absolute tolerance on every coordinate.
         Params:
             tolerance = Tolerance in coordinate units. Nonpositive values disable this criterion.

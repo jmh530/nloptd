@@ -36,6 +36,8 @@ private void testInitialStep()
         return a * a + b * b;
     });
     opt.setInitialStep([0.1, 20.0]);
+    opt.setXWeights([1.0, 0.01]);
+    opt.setXTolRel(1e-12);
     opt.setXTolAbs([1e-8, 1e-6]);
     opt.setMaxEvaluations(500);
     double[2] point = [0, 0];
