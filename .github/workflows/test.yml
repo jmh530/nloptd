@@ -42,11 +42,22 @@ jobs:
           "$prefix/bin" >> $env:GITHUB_PATH
       - shell: bash
         run: |
-          dub test --compiler="$DC"
-          dub run --root=tests/consumer --compiler="$DC"
-          dub run --root=example --compiler="$DC"
-      - if: matrix.os == 'ubuntu-24.04' && matrix.compiler == 'ldc-1.43.0'
-        run: dub run --root=example/mir --compiler="$DC"
+          dub test --skip-registry=all --compiler="$DC"
+          dub run --root=tests/consumer --skip-registry=all --compiler="$DC"
+          dub run --root=example --skip-registry=all --compiler="$DC"
+
+  mir:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.43.0
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libnlopt-dev
+          export NLOPT_INCLUDE_DIR="$(pkg-config --variable=includedir nlopt)"
+          dub run --root=example/mir --compiler="$DC"
 
   gdc:
     runs-on: ubuntu-24.04
