@@ -1,0 +1,9 @@
+{
+    "name": "nloptd-mir-example",
+    "targetType": "executable",
+    "targetPath": ".dub",
+    "dependencies": {
+        "nloptd": {"path": "../.."},
+        "mir-algorithm": "~>3.22.4"
+    }
+}
