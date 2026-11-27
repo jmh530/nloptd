@@ -1,35 +1,89 @@
 # nloptd
 
-A D interface to the native NLopt optimization library. The development API provides a move-only optimizer, scalar minimization and maximization with D functions and captured delegates, and in-place results. Import `nloptd.raw` for the full C API from your installed `nlopt.h`.
+nloptd lets you minimize or maximize a function written in D using algorithms from NLopt. Import `nloptd` for the D interface or `nloptd.raw` for the C API from your installed `nlopt.h`.
+
+Upgrading from 0.2.1? The [migration guide](MIGRATION.md) shows the same problem with the old and new APIs.
+
+## A first solve
+
+Find the value of `x` closest to 2, subject to `x ≤ 1`. The objective is the squared distance `(x − 2)²`. SLSQP uses its derivative, which the callback writes whenever NLopt requests a gradient.
+
+```d
+import nloptd;
+import std.stdio : writeln;
+
+void main()
+{
+    double target = 2;
+    auto opt = Optimizer(Algorithm.ldSLSQP, 1);
+    opt.setMinObjective((x, gradient) {
+        const delta = x[0] - target;
+        if (gradient.length) gradient[0] = 2 * delta;
+        return delta * delta;
+    });
+    opt.setUpperBounds(1.0);
+    opt.setXTolRel(1e-9);
+    opt.setMaxEvaluations(200);
+    double[1] point = [0.25];
+    auto result = opt.optimizeInPlace(point[]);
+    writeln(point[], " ", result);
+}
+```
+
+The best point is `x = 1`, where the objective value is also 1. After the solve, `point` holds the final coordinates. Read `result.value` for the objective, `result.termination` for the stopping reason, and `result.evaluations` for the number of objective evaluations.
 
 ## Build and run
 
-Install a D compiler with ImportC support, DUB, a working host C preprocessor and the NLopt development headers and shared library for your target architecture. Primary targets are DMD 2.114.0 and LDC 1.43.0 on Windows x64 and Ubuntu x86-64. The development tests use NLopt 2.11.0.
+Use DUB, a D compiler with ImportC support, and a working C preprocessor. Install the NLopt headers and shared library for your target architecture from the same installation. With DMD and LDC, the import name `nlopt` must resolve to that installation’s `nlopt.h`. Primary targets are DMD 2.114.0 and LDC 1.43.0 on Ubuntu x86-64 and Windows x64. CI also tests LDC on macOS.
 
-With DMD or LDC on Ubuntu, install `libnlopt-dev` and `pkg-config`, then run:
+### Ubuntu
 
 ```sh
+sudo apt install libnlopt-dev pkg-config
 export NLOPT_INCLUDE_DIR="$(pkg-config --variable=includedir nlopt)"
-dub run --root=example
-dub run --root=tests/consumer
 ```
 
-For custom Unix prefixes, also make the library directory available to the linker and runtime loader. On Linux these can be set with `LIBRARY_PATH` and `LD_LIBRARY_PATH`. On macOS with Homebrew, set `NLOPT_INCLUDE_DIR="$(brew --prefix nlopt)/include"` and `LIBRARY_PATH="$(brew --prefix nlopt)/lib"`.
+For a custom NLopt installation, add its library directory to `LIBRARY_PATH` for linking and `LD_LIBRARY_PATH` for running the program. [Upstream NLopt installation guide](https://nlopt.readthedocs.io/en/latest/NLopt_Installation/)
 
-On Windows, use an x64 MSVC-compatible build of NLopt. For example, after installing `nlopt:x64-windows` with vcpkg, use PowerShell:
+### macOS
+
+```sh
+brew install nlopt
+export NLOPT_INCLUDE_DIR="$(brew --prefix nlopt)/include"
+export LIBRARY_PATH="$(brew --prefix nlopt)/lib"
+```
+
+### Windows x64
+
+Use an MSVC-compatible build of NLopt. With vcpkg, run the following in PowerShell with `VCPKG_ROOT` set to your vcpkg installation.
 
 ```powershell
+& (Join-Path $env:VCPKG_ROOT 'vcpkg.exe') install nlopt:x64-windows
 $prefix = Join-Path $env:VCPKG_ROOT installed/x64-windows
 $env:NLOPT_INCLUDE_DIR = Join-Path $prefix include
 $env:NLOPT_LIB_DIR = Join-Path $prefix lib
 $env:PATH = (Join-Path $prefix bin) + ';' + $env:PATH
-dub run --root=example
-dub run --root=tests/consumer
 ```
 
-These settings apply to downstream DUB builds as well. Use the header and native library from the same installation. With DMD and LDC, the module name `nlopt` must resolve to that header. [NLopt installation guide](https://nlopt.readthedocs.io/en/latest/NLopt_Installation/)
+### Run the example
 
-### Experimental GDC 16 support on Debian
+From the nloptd repository root, run `dub run --root=example`. To run the downstream integration tests, use `dub run --root=tests/consumer`.
+
+### Use nloptd in your application
+
+To try the modern API from source, clone the nloptd repository beside your application directory. For an application named `my-app`, use the following minimal `my-app/dub.json`.
+
+```json
+{
+    "name": "my-app",
+    "dependencies": { "nloptd": { "path": "../nloptd" } }
+}
+```
+
+Save the first-solve example as `my-app/source/app.d` and run `dub run` from `my-app` with the environment settings above. Once version 0.3.0 is available on the DUB registry, new projects can add it with `dub add nloptd@0.3.0`.
+
+<details>
+<summary>Experimental GDC 16 setup on Debian</summary>
 
 GDC 16.2 finds `nlopt.h` but rejects directives such as `#ifndef` when importing it directly. Use GDC's C preprocessor to produce `nlopt.i` from the installed header. Select C11 explicitly because GCC 16's default C mode exposes a C23 `nullptr_t` declaration in `<stddef.h>` that this version of ImportC cannot parse. [GDC ImportC manual](https://gcc.gnu.org/onlinedocs/gdc/ImportC.html)
 
@@ -45,138 +99,14 @@ dub run --root=tests/consumer --compiler="$dc"
 
 For your own DUB project, run the same preprocessing commands, then use `dub build --compiler="$dc"` from your project root. Keep the generated directory available to DUB: `nloptd.raw` imports `nlopt.i` from it and links against the installed NLopt library. Regenerate the file and rebuild with `--force` after changing the headers, compiler, or target. The temporary directory can be removed when those builds are finished.
 
-## Bound-constrained minimization
+</details>
 
-```d
-import nloptd;
+## Working with an optimizer
 
-auto opt = Optimizer(Algorithm.ldSLSQP, 1);
-double target = 2;
-opt.setMinObjective((x, grad) {
-    const delta = x[0] - target;
-    if (grad.length) grad[0] = 2 * delta;
-    return delta * delta;
-});
-opt.setUpperBounds(1.0);
-opt.setXTolRel(1e-9);
-opt.setMaxEvaluations(200);
-
-double[1] point = [0.25];
-auto result = opt.optimizeInPlace(point[]);
-// The minimum occurs at the upper bound. Both point[0] and result.value are approximately 1.
-```
-
-The callback borrows both slices for one invocation. An empty gradient means NLopt requests only the value. The registration retains the delegate between runs. Exceptions stop the native solve and propagate back to the caller as the original D throwable. Call `forceStop()` from a callback to request an ordinary interrupted result. Interpret partial results using the termination reason.
-
-A local optimizer releases its native handle at scope exit. If the owner is destroyed during an evaluation, the active solve retains the handle until it finishes handling the result or callback exception. For a GC-managed class with an `Optimizer` field, prefer explicit destruction when the resource is no longer needed. If relying on GC finalization, declare a class destructor (an empty `~this() {}` suffices). With DMD 2.114.0, the field destructor alone did not mark the enclosing class allocation for finalization.
-
-## Initial steps for derivative-free optimization
-
-For Nelder–Mead, use `opt.setInitialStep(0.5)` to set the same initial step on every coordinate. When coordinates have different scales, use one signed, nonzero step per coordinate, for example `opt.setInitialStep([0.1, 20.0])`. NLopt copies the steps and keeps them across solves. Call `opt.resetInitialStep()` to let NLopt choose steps from the starting point and bounds again.
-
-## Population size and vector storage
-
-For a population-based algorithm such as CRS2, `opt.setPopulation(40)` requests a population of 40 candidate points. For a limited-memory quasi-Newton algorithm such as L-BFGS, `opt.setVectorStorage(5)` requests storage for five previous updates. A larger history uses more memory. Pass zero to either setter to restore NLopt's default for that setting.
-
-CRS2 needs at least one more candidate than the problem dimension. Both setters check explicit settings against the algorithm's native integer and workspace limits before replacing the current value. Available memory can still limit the solve.
-
-## Stopping criteria
-
-Choose criteria in the units of the problem. With `setStopValue(target)`, minimization seeks an objective value below the target and maximization seeks one above it. Whether exact equality triggers `Termination.stopValueReached` depends on the algorithm. A finite target stays in effect when you switch objective direction.
-
-`setFTolAbs` and `setFTolRel` set tolerances on changes in the objective. `setXTolAbs` accepts either a uniform absolute tolerance or one per coordinate. For example, `opt.setXTolAbs([1e-4, 1e-8])` gives a two-dimensional problem different absolute tolerances for its two coordinates. Use `setXTolRel` for a relative coordinate tolerance.
-
-Use `setMaxEvaluations` to limit objective evaluations or `setMaxTime` for an approximate time limit in seconds. An evaluation in progress can run past the time limit. Check `result.termination` to see which criterion ended the run.
-
-## Maximization
-
-Use `setMaxObjective` with the value and derivatives of the function you want to maximize. This quadratic peaks at `x = 3`, where the returned objective value is 7.
-
-```d
-import nloptd;
-
-auto opt = Optimizer(Algorithm.ldSLSQP, 1);
-opt.setMaxObjective((x, gradient) {
-    const delta = x[0] - 3;
-    if (gradient.length) gradient[0] = -2 * delta;
-    return 7 - delta * delta;
-});
-opt.setXTolRel(1e-9);
-opt.setMaxEvaluations(100);
-double[1] point = [0];
-auto result = opt.optimizeInPlace(point[]);
-```
-
-## Scalar nonlinear constraints
-
-Use `addInequalityConstraint` for `c(x) ≤ 0` and `addEqualityConstraint` for `h(x) = 0`. Each call registers another constraint. The optional second argument is the absolute tolerance NLopt uses to judge feasibility when stopping. It defaults to zero. Select an algorithm that supports the constraints you need, such as SLSQP for equalities or MMA for inequalities.
-
-For example, this SLSQP constraint requires the point to lie on the unit circle in two dimensions.
-
-```d
-import nloptd;
-
-auto opt = Optimizer(Algorithm.ldSLSQP, 2);
-opt.addEqualityConstraint((x, gradient) {
-    if (gradient.length)
-    {
-        gradient[0] = 2 * x[0];
-        gradient[1] = 2 * x[1];
-    }
-    return x[0] * x[0] + x[1] * x[1] - 1;
-}, 1e-8);
-```
-
-Constraints follow the objective's slice lifetime and exception rules. Each registration retains its own callback across solves. The [consumer test](tests/consumer/source/app.d) includes the NLopt MMA tutorial with two separately captured cubic inequalities.
-
-## Vector-valued nonlinear constraints
-
-To reuse an optimizer with a different constraint set, call `removeEqualityConstraints()` or `removeInequalityConstraints()` between solves. Each method clears both scalar and vector callbacks of that kind and releases the wrapper's references to them. You can then add fresh constraints. Repeated removal is allowed.
-
-Use `addEqualityMConstraint` or `addInequalityMConstraint` to evaluate several residuals at the same point. Supply one nonnegative absolute feasibility tolerance per residual. NLopt copies these tolerances at registration. An empty tolerance slice registers no constraints.
-
-For MMA and CCSAQ, NLopt 2.11.0 calculates its workspace size using unsigned integer arithmetic. The wrapper checks the dimension at construction and the total number of residuals across scalar and vector registrations before adding a constraint.
-
-The callback borrows all three slices for one invocation. Write every residual. When NLopt requests derivatives, write one row per residual in the flat gradient slice. For `n` coordinates, `gradient[i * n + j]` is the derivative of residual `i` with respect to coordinate `j`.
-
-```d
-import nloptd;
-
-auto opt = Optimizer(Algorithm.ldSLSQP, 3);
-opt.addEqualityMConstraint((residuals, x, gradient) {
-    residuals[0] = x[0] + 2 * x[1] - 3;
-    residuals[1] = -x[1] + 3 * x[2] - 8;
-    if (gradient.length)
-        gradient[] = [1.0, 2, 0, 0, -1, 3];
-}, [1e-9, 1e-8]);
-```
-
-## Subsidiary optimizers
-
-Use `setLocalOptimizer` to select the local algorithm and its stopping criteria. Configure the objective, bounds, and constraints on the parent. The local optimizer must have the same dimension. NLopt copies its configuration at registration, so you can reuse it or let it leave scope before the parent runs.
-
-```d
-import nloptd;
-
-auto opt = Optimizer(Algorithm.auglag, 1);
-{
-    auto local = Optimizer(Algorithm.ldSLSQP, 1);
-    local.setXTolRel(1e-10);
-    opt.setLocalOptimizer(local);
-}
-```
-
-Calling the setter again replaces the local solver. A dimension mismatch preserves the existing configuration. If NLopt reports an out-of-memory error while copying a replacement, install a local solver again before retrying the solve.
-
-All AUGLAG variants used through `Optimizer`, including legacy algorithm IDs, require an explicit local solver before a solve or before installation as another optimizer's subsidiary. You can register constraints before choosing the local solver. Callers using NLopt's legacy process-wide defaults can still access them through `nloptd.raw`.
-
-MMA and CCSAQ create their dual solver from the selected algorithm and stopping criteria. This discards the local solver AUGLAG needs, so `setLocalOptimizer` rejects all AUGLAG variants in that position and preserves the previously configured solver.
-
-The wrapper checks AUGLAG's workspace size using the total number of residuals it penalizes and the width of the largest constraint callback. AUGLAG_EQ forwards inequalities to its local solver, whose limits also apply.
-
-## Migrating from 0.2.1
-
-See the [migration guide](MIGRATION.md) for a before-and-after example, method names, and changes to ownership and callbacks.
+- **Objectives and callbacks.** Use `setMinObjective` or `setMaxObjective` with a D function or captured delegate. The callback can use the coordinate and gradient slices for the duration of the call. [Callbacks and ownership](docs/optimizer.md#callbacks-and-ownership) · [Maximization example](docs/optimizer.md#maximization)
+- **Stopping criteria.** Set a tolerance, a target objective value, or a time or evaluation limit. Check the stopping reason before treating the result as converged. [Stopping criteria](docs/optimizer.md#stopping-criteria)
+- **Constraints.** Use bounds for coordinate limits and callbacks for nonlinear equalities and inequalities. A vector callback can evaluate several residuals together. [Scalar constraints](docs/optimizer.md#scalar-nonlinear-constraints) · [Vector constraints and gradient layout](docs/optimizer.md#vector-valued-nonlinear-constraints)
+- **Algorithm settings.** Choose initial steps for derivative-free methods, tune population size or vector storage, or supply a local solver for AUGLAG. [Initial steps](docs/optimizer.md#initial-steps-for-derivative-free-optimization) · [Population and storage](docs/optimizer.md#population-size-and-vector-storage) · [Subsidiary optimizers](docs/optimizer.md#subsidiary-optimizers)
 
 ## License
 
