@@ -381,6 +381,22 @@ private extern(C) void evaluateVector(uint m, double* residuals, uint n, const(d
     derivatives[] = 0;
 }
 
+private template isMirSlice(S)
+{
+    import std.traits : moduleName;
+
+    // Only resolve the optional dependency when a Mir slice is passed.
+    static if (is(S == T!Args, alias T, Args...) && moduleName!T == "mir.ndslice.slice")
+    {
+        import mir.ndslice.slice : Slice;
+        import std.traits : isInstanceOf;
+
+        enum isMirSlice = isInstanceOf!(Slice, S);
+    }
+    else
+        enum isMirSlice = false;
+}
+
 /// Move-only owner. Confine an active optimizer and its callbacks to one thread.
 /// A default-initialized or moved-from optimizer is inert.
 struct Optimizer
@@ -1145,6 +1161,33 @@ struct Optimizer
         auto result = opt.optimizeInPlace(point[]);
         assert(abs(point[0] - target) < 1e-6);
         assert(result.value < 1e-10);
+    }
+
+    /**
+        Optimize the coordinates in a contiguous Mir ndslice in place.
+        Params:
+            S = Contiguous Mir ndslice type whose field exposes a mutable double[].
+            point = Initial coordinates in storage order. The total element count
+                must equal the optimizer dimension. The solve writes the final
+                coordinates directly into the same storage.
+        Returns: An OptimizationResult containing the objective value, termination
+            reason and evaluation count. Interrupted runs may leave a partial point.
+        Throws: The original callback throwable, NloptException on native failure,
+            or Exception for invalid optimizer state or dimension.
+    */
+    auto optimizeInPlace(S)(scope S point)
+        if (isMirSlice!S)
+    {
+        import mir.ndslice.slice : Contiguous;
+
+        static if (S.kind != Contiguous)
+            static assert(false, "optimizeInPlace requires a contiguous Mir slice. "
+                ~ "For a strided view, copy the coordinates into a double[], optimize it, and copy the result back.");
+        else static if (!is(typeof(point.field) == double[]))
+            static assert(false, "optimizeInPlace requires writable double storage. "
+                ~ "Copy the coordinates into a mutable double[] and optimize that array.");
+        else
+            return optimizeInPlace(point.field);
     }
 
     unittest

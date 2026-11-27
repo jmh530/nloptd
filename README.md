@@ -1,6 +1,6 @@
 # nloptd
 
-nloptd lets you minimize or maximize a function written in D using algorithms from NLopt. Import `nloptd` for the D interface or `nloptd.raw` for the C API from your installed `nlopt.h`.
+nloptd lets you minimize or maximize a function written in D using algorithms from [NLopt](https://github.com/stevengj/nlopt). Import `nloptd` for the D interface or `nloptd.raw` for the C API from your installed `nlopt.h`.
 
 Upgrading from 0.2.1? The [migration guide](MIGRATION.md) shows the same problem with the old and new APIs.
 
@@ -100,8 +100,8 @@ For your own DUB project, run the same preprocessing commands, then use `dub bui
 
 ## Working with an optimizer
 
-- **Mir ndslices.** The [Mir examples](example/mir/source/app.d) show how to pass `.field` from a contiguous, mutable `double[]`-backed ndslice to `optimizeInPlace` and how to optimize a strided matrix column using a work array. Their shared objective uses `.sliced` to view the coordinate and gradient arrays without copying. Run both with `dub run --root=example/mir` from the repository root. Only the example package depends on `mir-algorithm`.
-- **Objectives and callbacks.** Use `setMinObjective` or `setMaxObjective` with a D function or captured delegate. The callback can use the coordinate and gradient slices for the duration of the call. [Callbacks and ownership](docs/optimizer.md#callbacks-and-ownership) · [Maximization example](docs/optimizer.md#maximization)
+- **Mir ndslices.** See [using Mir with nloptd](docs/mir.md) for contiguous points, matrix rows, and strided columns.
+- **Objectives and callbacks.** Use `setMinObjective` or `setMaxObjective` with a D function or captured delegate. [Objective and constraint callbacks](docs/callbacks.md) · [Callbacks and ownership](docs/optimizer.md#callbacks-and-ownership) · [Maximization example](docs/optimizer.md#maximization)
 - **Stopping criteria.** Set a tolerance, a target objective value, or a time or evaluation limit. Check the stopping reason before treating the result as converged. [Stopping criteria](docs/optimizer.md#stopping-criteria)
 - **Constraints.** Use bounds for coordinate limits and callbacks for nonlinear equalities and inequalities. A vector callback can evaluate several residuals together. [Scalar constraints](docs/optimizer.md#scalar-nonlinear-constraints) · [Vector constraints and gradient layout](docs/optimizer.md#vector-valued-nonlinear-constraints)
 - **Algorithm settings.** Choose initial steps for derivative-free methods, tune population size or vector storage, or supply a local solver for AUGLAG. [Initial steps](docs/optimizer.md#initial-steps-for-derivative-free-optimization) · [Population and storage](docs/optimizer.md#population-size-and-vector-storage) · [Subsidiary optimizers](docs/optimizer.md#subsidiary-optimizers)
