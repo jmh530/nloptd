@@ -29,12 +29,15 @@ private double sphere(scope const(double)[] x, scope double[] gradient)
 private void testInitialStep()
 {
     auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+    assert(opt.dimension == 2 && opt.algorithmName.length > 0);
     opt.setMinObjective((x, grad) {
         const a = x[0] - 0.5;
         const b = (x[1] - 100) / 100;
         return a * a + b * b;
     });
     opt.setInitialStep([0.1, 20.0]);
+    opt.setXWeights([1.0, 0.01]);
+    opt.setXTolRel(1e-12);
     opt.setXTolAbs([1e-8, 1e-6]);
     opt.setMaxEvaluations(500);
     double[2] point = [0, 0];

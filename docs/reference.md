@@ -19,7 +19,11 @@ import c = nloptd.raw;
 
 auto simplex = Optimizer(Algorithm.lnNelderMead, 2);
 auto cobyla = Optimizer(c.NLOPT_LN_COBYLA, 2);
+assert(cobyla.dimension == 2);
+assert(cobyla.algorithm == c.NLOPT_LN_COBYLA);
 ```
+
+Read `opt.dimension` for the number of variables, `opt.algorithm` for the native identifier, and `opt.algorithmName` for NLopt's human-readable description. All three properties are available on a const optimizer.
 
 Choose an algorithm that supports the derivatives and constraints of your problem. The upstream algorithm guide lists those capabilities for each solver. [NLopt algorithms](https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/)
 
@@ -97,6 +101,12 @@ Enable the tests relevant to the problem. NLopt can return as soon as one enable
 | `setMaxTime(double seconds)` | The time budget is reached. An evaluation already in progress can run beyond it. |
 
 A nonpositive evaluation limit or time budget disables that test. For example, combine `opt.setXTolRel(1e-8)` with `opt.setMaxEvaluations(1000)` to bound the work if progress is slow. The result identifies which test ended the run. [Stopping criteria examples](optimizer.md#stopping-criteria)
+
+### Variable weights
+
+Algorithms that use NLopt's weighted relative-change test give each variable a default weight of one. For variables with typical magnitudes of 1 and 100, `opt.setXWeights([1.0, 0.01])` gives changes of those respective magnitudes equal weight. Supply one finite, nonnegative weight per variable. A zero weight omits that variable from the norm. Use `opt.setXWeights(1.0)` to restore unit weights. Some algorithms interpret `setXTolRel` differently. In NLopt 2.11.0, COBYLA and BOBYQA use it to set a final trust-region radius and ignore variable weights.
+
+In NLopt 2.11.0, algorithms such as Nelder–Mead remove variables whose lower and upper bounds are equal. The weights stay in their original order, so fixing the first of two variables makes the solver use the first weight for the remaining variable. When you need nonuniform weights with one of these algorithms, construct the optimizer with only the free variables, supply their weights in the same order, and use the fixed values as constants in your objective and constraints. [NLopt 2.11.0 dimension reduction](https://github.com/stevengj/nlopt/blob/v2.11.0/src/api/optimize.c#L350-L354)
 
 ### Forced termination
 

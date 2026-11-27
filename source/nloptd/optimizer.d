@@ -316,6 +316,7 @@ private struct State
 {
     // Borrowed from NativeOwner for configuration and callback dispatch.
     c.nlopt_opt handle;
+    uint dimension;
     ScalarCallback objective;
     ConstraintCallbacks inequalities, equalities;
     Throwable pending;
@@ -426,6 +427,7 @@ struct Optimizer
     {
         enforce(dimension > 0, "NLopt requires a positive dimension");
         state = new State;
+        state.dimension = dimension;
         state.solver = SolverConfig(algorithm);
         state.solver.checkWorkspace(dimension, state.sizes);
         owner = NativeOwner.create(algorithm, dimension);
@@ -456,6 +458,63 @@ struct Optimizer
         GC.runFinalizers((cast(const void*) typeid(Holder).destructor)[0 .. 1]);
         assert(Holder.finalized);
         assert(destructions == before + 1);
+    }
+
+    /** Number of variables supplied at construction.
+        Returns: The positive problem dimension as a uint.
+        Throws: Exception for a default-initialized or moved-from optimizer.
+    */
+    @property uint dimension() const
+    {
+        enforce(state, "Optimizer has no native handle");
+        return state.dimension;
+    }
+
+    ///
+    unittest
+    {
+        const opt = Optimizer(Algorithm.ldMMA, 2);
+        assert(opt.dimension == 2);
+    }
+
+    /** Algorithm selected at construction.
+        Returns: The native algorithm identifier, including identifiers from nloptd.raw.
+        Throws: Exception for a default-initialized or moved-from optimizer.
+    */
+    @property c.nlopt_algorithm algorithm() const
+    {
+        enforce(state, "Optimizer has no native handle");
+        return state.solver.algorithm;
+    }
+
+    ///
+    unittest
+    {
+        import raw = nloptd.raw;
+        auto opt = Optimizer(raw.NLOPT_LN_COBYLA, 2);
+        assert(opt.algorithm == raw.NLOPT_LN_COBYLA);
+    }
+
+    /** Descriptive name supplied by the linked NLopt library.
+        Returns: A D string containing the algorithm description.
+        Throws: Exception for a default-initialized or moved-from optimizer.
+    */
+    @property string algorithmName() const
+    {
+        return c.nlopt_algorithm_name(algorithm).fromStringz.idup;
+    }
+
+    unittest
+    {
+        import std.algorithm.mutation : move;
+        import std.exception : assertThrown;
+
+        auto original = Optimizer(Algorithm.ldMMA, 2);
+        auto opt = move(original);
+        assert(opt.algorithmName == c.nlopt_algorithm_name(c.NLOPT_LD_MMA).fromStringz);
+        assertThrown(original.dimension);
+        assertThrown(original.algorithm);
+        assertThrown(original.algorithmName);
     }
 
     private State* idle()
@@ -539,7 +598,7 @@ struct Optimizer
     void setLowerBounds(scope const(double)[] bounds)
     {
         auto s = idle();
-        enforce(bounds.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
+        enforce(bounds.length == s.dimension, "Dimension mismatch");
         s.check(c.nlopt_set_lower_bounds(s.handle, bounds.ptr));
     }
 
@@ -562,7 +621,7 @@ struct Optimizer
     void setUpperBounds(scope const(double)[] bounds)
     {
         auto s = idle();
-        enforce(bounds.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
+        enforce(bounds.length == s.dimension, "Dimension mismatch");
         s.check(c.nlopt_set_upper_bounds(s.handle, bounds.ptr));
     }
 
@@ -587,7 +646,7 @@ struct Optimizer
     void setInitialStep(scope const(double)[] steps)
     {
         auto s = idle();
-        enforce(steps.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
+        enforce(steps.length == s.dimension, "Dimension mismatch");
         s.check(c.nlopt_set_initial_step(s.handle, steps.ptr));
     }
 
@@ -638,7 +697,7 @@ struct Optimizer
     void setPopulation(uint size)
     {
         auto s = idle();
-        checkPopulation(s.solver.algorithm, c.nlopt_get_dimension(s.handle), size);
+        checkPopulation(s.solver.algorithm, s.dimension, size);
         s.check(c.nlopt_set_population(s.handle, size));
     }
 
@@ -695,7 +754,7 @@ struct Optimizer
     void setVectorStorage(uint count)
     {
         auto s = idle();
-        checkVectorStorage(s.solver.algorithm, c.nlopt_get_dimension(s.handle), count);
+        checkVectorStorage(s.solver.algorithm, s.dimension, count);
         s.check(c.nlopt_set_vector_storage(s.handle, count));
     }
 
@@ -739,7 +798,7 @@ struct Optimizer
         enum inequality = __traits(isSame, register, c.nlopt_add_inequality_constraint);
         auto callbacks = inequality ? &s.inequalities : &s.equalities;
         auto sizes = s.sizes.adding(inequality, 1);
-        s.solver.checkWorkspace(c.nlopt_get_dimension(s.handle), sizes);
+        s.solver.checkWorkspace(s.dimension, sizes);
         auto callback = new ScalarCallback(s, constraint, callbacks.scalar);
         s.check(register(s.handle, &evaluate, callback, tolerance));
         s.sizes = sizes;
@@ -810,8 +869,8 @@ struct Optimizer
         enum inequality = __traits(isSame, register, c.nlopt_add_inequality_mconstraint);
         auto callbacks = inequality ? &s.inequalities : &s.equalities;
         auto sizes = s.sizes.adding(inequality, count);
-        s.solver.checkWorkspace(c.nlopt_get_dimension(s.handle), sizes);
-        enforce(tolerances.length <= size_t.max / double.sizeof / c.nlopt_get_dimension(s.handle),
+        s.solver.checkWorkspace(s.dimension, sizes);
+        enforce(tolerances.length <= size_t.max / double.sizeof / s.dimension,
                 "Constraint gradient is too large");
         foreach (tolerance; tolerances)
             enforce(tolerance >= 0, "Constraint tolerance must be nonnegative");
@@ -939,11 +998,11 @@ struct Optimizer
         auto s = idle();
         auto source = local.idle();
         enforce(s !is source, "Optimizer cannot be its own local solver");
-        source.solver.checkWorkspace(c.nlopt_get_dimension(source.handle), ConstraintSizes.init, true);
+        source.solver.checkWorkspace(source.dimension, ConstraintSizes.init, true);
         auto replacement = SolverConfig(s.solver.algorithm,
                 new SolverConfig(source.solver.algorithm, source.solver.local));
-        const dimension = c.nlopt_get_dimension(s.handle);
-        if (dimension == c.nlopt_get_dimension(source.handle))
+        const dimension = s.dimension;
+        if (dimension == source.dimension)
             replacement.checkWorkspace(dimension, s.sizes);
         s.finishLocalReplacement(c.nlopt_set_local_optimizer(s.handle, source.handle), replacement);
     }
@@ -1031,6 +1090,68 @@ struct Optimizer
         s.check(c.nlopt_set_xtol_rel(s.handle, tolerance));
     }
 
+    /** Set a uniform weight for algorithms that use the weighted relative-change test.
+        Pass one to restore unit weights after setting individual weights.
+        Params:
+            weight = Nonnegative finite weight for every variable. The default is one.
+        Throws: Exception for an invalid weight, inactive owner, active solve or native failure.
+    */
+    void setXWeights(double weight)
+    {
+        import std.math : isFinite;
+        auto s = idle();
+        enforce(weight >= 0 && isFinite(weight), "Weights must be finite and nonnegative");
+        s.check(c.nlopt_set_x_weights1(s.handle, weight));
+    }
+
+    /** Set individual weights for algorithms that use the weighted relative-change test.
+        In NLopt 2.11.0, COBYLA and BOBYQA ignore these weights. Algorithms such
+        as Nelder-Mead remove fixed variables but retain the original weight order.
+        For nonuniform weights in that case, optimize only the free variables and
+        supply their weights in the same order.
+        Params:
+            weights = One nonnegative finite weight per variable, copied by NLopt.
+                A zero weight omits that variable from the weighted norm.
+        Throws: Exception for a dimension mismatch, invalid weight, inactive owner,
+            active solve or native failure.
+    */
+    void setXWeights(scope const(double)[] weights)
+    {
+        import std.math : isFinite;
+        auto s = idle();
+        enforce(weights.length == s.dimension, "Dimension mismatch");
+        foreach (weight; weights)
+            enforce(weight >= 0 && isFinite(weight), "Weights must be finite and nonnegative");
+        s.check(c.nlopt_set_x_weights(s.handle, weights.ptr));
+    }
+
+    ///
+    unittest
+    {
+        auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+        opt.setXTolRel(1e-8);
+        opt.setXWeights([1.0, 0.01]);
+    }
+
+    unittest
+    {
+        import std.exception : assertThrown;
+        auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+        double[2] actual;
+        opt.setXWeights(2.0);
+        opt.state.check(c.nlopt_get_x_weights(opt.state.handle, actual.ptr));
+        assert(actual == [2.0, 2.0]);
+
+        double[2] weights = [0, 0.5];
+        opt.setXWeights(weights[]);
+        weights[] = 1;
+        assertThrown(opt.setXWeights(weights[0 .. 1]));
+        assertThrown(opt.setXWeights([-1.0, 1.0]));
+        assertThrown(opt.setXWeights(double.nan));
+        opt.state.check(c.nlopt_get_x_weights(opt.state.handle, actual.ptr));
+        assert(actual == [0.0, 0.5]);
+    }
+
     /** Set the same absolute tolerance on every coordinate.
         Params:
             tolerance = Tolerance in coordinate units. Nonpositive values disable this criterion.
@@ -1051,7 +1172,7 @@ struct Optimizer
     void setXTolAbs(scope const(double)[] tolerances)
     {
         auto s = idle();
-        enforce(tolerances.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
+        enforce(tolerances.length == s.dimension, "Dimension mismatch");
         s.check(c.nlopt_set_xtol_abs(s.handle, tolerances.ptr));
     }
 
@@ -1126,8 +1247,8 @@ struct Optimizer
     {
         auto s = idle();
         enforce(s.objective.callable !is null, "Missing objective");
-        enforce(point.length == c.nlopt_get_dimension(s.handle), "Dimension mismatch");
-        s.solver.checkWorkspace(c.nlopt_get_dimension(s.handle), s.sizes, true);
+        enforce(point.length == s.dimension, "Dimension mismatch");
+        s.solver.checkWorkspace(s.dimension, s.sizes, true);
         auto activeOwner = owner;
         activeOwner.retain();
         scope(exit) activeOwner.release();
