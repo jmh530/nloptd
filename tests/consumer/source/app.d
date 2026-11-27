@@ -29,6 +29,7 @@ private double sphere(scope const(double)[] x, scope double[] gradient)
 private void testInitialStep()
 {
     auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+    assert(opt.dimension == 2 && opt.algorithmName.length > 0);
     opt.setMinObjective((x, grad) {
         const a = x[0] - 0.5;
         const b = (x[1] - 100) / 100;

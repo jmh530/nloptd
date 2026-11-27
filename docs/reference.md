@@ -19,7 +19,11 @@ import c = nloptd.raw;
 
 auto simplex = Optimizer(Algorithm.lnNelderMead, 2);
 auto cobyla = Optimizer(c.NLOPT_LN_COBYLA, 2);
+assert(cobyla.dimension == 2);
+assert(cobyla.algorithm == c.NLOPT_LN_COBYLA);
 ```
+
+Read `opt.dimension` for the number of variables, `opt.algorithm` for the native identifier, and `opt.algorithmName` for NLopt's human-readable description. All three properties are available on a const optimizer.
 
 Choose an algorithm that supports the derivatives and constraints of your problem. The upstream algorithm guide lists those capabilities for each solver. [NLopt algorithms](https://nlopt.readthedocs.io/en/latest/NLopt_Algorithms/)
 
