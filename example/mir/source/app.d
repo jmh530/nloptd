@@ -1,5 +1,7 @@
 import mir.ndslice.slice : sliced;
 import nloptd;
+import std.math : abs;
+import std.stdio : writeln;
 
 void main()
 {
@@ -19,4 +21,16 @@ void main()
     });
     opt.setXTolRel(1e-9);
     opt.setMaxEvaluations(100);
+
+    optimizeContiguousPoint(opt);
+}
+
+private void optimizeContiguousPoint(ref Optimizer opt)
+{
+    double[2] storage = [5, 6];
+    auto point = storage[].sliced;
+    assert(point.field is storage[]);
+    opt.optimizeInPlace(point.field);
+    assert(abs(point[0] - 1) < 1e-7 && abs(point[1] + 2) < 1e-7);
+    writeln("Contiguous point: ", storage[]);
 }

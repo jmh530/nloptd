@@ -100,7 +100,7 @@ For your own DUB project, run the same preprocessing commands, then use `dub bui
 
 ## Working with an optimizer
 
-- **Mir ndslices.** The [Mir example](example/mir/source/app.d) uses `.sliced` to view the coordinate and gradient arrays during the objective callback. Run `dub run --root=example/mir` from the repository root. Only this example depends on `mir-algorithm`.
+- **Mir ndslices.** The [Mir example](example/mir/source/app.d) shows how to pass `.field` from a contiguous, mutable `double[]`-backed ndslice to `optimizeInPlace`. Its objective uses `.sliced` to view the coordinate and gradient arrays without copying. Run `dub run --root=example/mir` from the repository root. Only this example depends on `mir-algorithm`.
 - **Objectives and callbacks.** Use `setMinObjective` or `setMaxObjective` with a D function or captured delegate. The callback can use the coordinate and gradient slices for the duration of the call. [Callbacks and ownership](docs/optimizer.md#callbacks-and-ownership) · [Maximization example](docs/optimizer.md#maximization)
 - **Stopping criteria.** Set a tolerance, a target objective value, or a time or evaluation limit. Check the stopping reason before treating the result as converged. [Stopping criteria](docs/optimizer.md#stopping-criteria)
 - **Constraints.** Use bounds for coordinate limits and callbacks for nonlinear equalities and inequalities. A vector callback can evaluate several residuals together. [Scalar constraints](docs/optimizer.md#scalar-nonlinear-constraints) · [Vector constraints and gradient layout](docs/optimizer.md#vector-valued-nonlinear-constraints)
