@@ -766,6 +766,19 @@ struct Optimizer
         s.check(c.nlopt_set_lower_bounds(s.handle, bounds.ptr));
     }
 
+    /** Read the current lower bounds between solves.
+        Params:
+            bounds = Output storage of length dimension. Receives one lower bound
+                per variable in input order. Unbounded entries are negative infinity.
+        Throws: Exception for a dimension mismatch, inactive owner, active solve or native failure.
+    */
+    void getLowerBounds(scope double[] bounds)
+    {
+        auto s = idle();
+        enforce(bounds.length == s.dimension, "Dimension mismatch");
+        s.check(c.nlopt_get_lower_bounds(s.handle, bounds.ptr));
+    }
+
     /** Set the same upper bound on every coordinate.
         Params:
             bound = Uniform bound. Use positive infinity to remove the bound.
@@ -787,6 +800,41 @@ struct Optimizer
         auto s = idle();
         enforce(bounds.length == s.dimension, "Dimension mismatch");
         s.check(c.nlopt_set_upper_bounds(s.handle, bounds.ptr));
+    }
+
+    /** Read the current upper bounds between solves.
+        Params:
+            bounds = Output storage of length dimension. Receives one upper bound
+                per variable in input order. Unbounded entries are positive infinity.
+        Throws: Exception for a dimension mismatch, inactive owner, active solve or native failure.
+    */
+    void getUpperBounds(scope double[] bounds)
+    {
+        auto s = idle();
+        enforce(bounds.length == s.dimension, "Dimension mismatch");
+        s.check(c.nlopt_get_upper_bounds(s.handle, bounds.ptr));
+    }
+
+    ///
+    unittest
+    {
+        auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+        opt.setUpperBounds([3.0, double.infinity]);
+        double[2] lower, upper;
+        opt.getLowerBounds(lower[]);
+        opt.getUpperBounds(upper[]);
+        assert(lower == [-double.infinity, -double.infinity]);
+        assert(upper == [3.0, double.infinity]);
+    }
+
+    unittest
+    {
+        import std.exception : assertThrown;
+        auto opt = Optimizer(Algorithm.lnNelderMead, 2);
+        double[2] output = [7, 9];
+        assertThrown(opt.getLowerBounds(output[0 .. 1]));
+        assertThrown(opt.getUpperBounds(output[0 .. 1]));
+        assert(output == [7, 9]);
     }
 
     /** Set a uniform initial step for algorithms such as Nelder-Mead.
@@ -823,6 +871,21 @@ struct Optimizer
         s.check(c.nlopt_set_initial_step(s.handle, null));
     }
 
+    /** Query the initial step at a proposed starting point between solves.
+        Params:
+            point = Starting values, one per variable.
+            steps = Output storage of length dimension. Receives the signed steps set by
+                setInitialStep, or NLopt's automatic steps for this point and the current bounds.
+                Querying automatic steps leaves automatic selection enabled.
+        Throws: Exception for a dimension mismatch, inactive owner, active solve or native failure.
+    */
+    void getInitialStep(scope const(double)[] point, scope double[] steps)
+    {
+        auto s = idle();
+        enforce(point.length == s.dimension && steps.length == s.dimension, "Dimension mismatch");
+        s.check(c.nlopt_get_initial_step(s.handle, point.ptr, steps.ptr));
+    }
+
     unittest
     {
         import std.exception : assertThrown;
@@ -831,11 +894,22 @@ struct Optimizer
         double[2] readSteps()
         {
             double[2] steps;
-            opt.state.check(c.nlopt_get_initial_step(opt.state.handle, point.ptr, steps.ptr));
+            opt.getInitialStep(point[], steps[]);
             return steps;
         }
 
         const automatic = readSteps();
+        point[] = [30, 50];
+        assert(readSteps() != automatic);
+        point[] = [3, 5];
+        assert(readSteps() == automatic);
+        double[3] sharedBuffer = [3, 5, 0];
+        opt.getInitialStep(sharedBuffer[0 .. 2], sharedBuffer[1 .. 3]);
+        assert(sharedBuffer[1 .. 3] == automatic[]);
+        double[2] output = [7, 9];
+        assertThrown(opt.getInitialStep(point[0 .. 1], output[]));
+        assertThrown(opt.getInitialStep(point[], output[0 .. 1]));
+        assert(output == [7, 9]);
         opt.setInitialStep(-0.5);
         assert(readSteps() == [-0.5, -0.5]);
         double[2] steps = [0.25, -2];
