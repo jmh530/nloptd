@@ -524,6 +524,170 @@ struct Optimizer
         return state;
     }
 
+    static if (__traits(hasMember, c, "nlopt_set_param"))
+    {
+        private static const(char)* parameterName(string name)
+        {
+            import std.string : toStringz;
+            enforce(name.length < 1024, "Parameter name must be at most 1023 bytes");
+            foreach (char ch; name)
+                enforce(ch != 0, "Parameter name contains a NUL byte");
+            return name.toStringz;
+        }
+
+        private static void checkMmaCcsaqParam(string name, double value)
+        {
+            switch (name)
+            {
+                case "dual_algorithm":
+                    throw new Exception("Use setLocalOptimizer to select the MMA or CCSAQ dual solver");
+                case "always_improve":
+                case "inner_gradients":
+                    enforce(value == 0 || value == 1, name ~ " must be zero or one");
+                    break;
+                case "verbosity":
+                    // Older NLopt versions convert verbosity directly to unsigned.
+                    enforce(value >= 0, "verbosity must be nonnegative");
+                    goto case "inner_maxeval";
+                case "dual_maxeval":
+                case "inner_maxeval":
+                    enforce(value >= int.min && value <= int.max && cast(int) value == value,
+                            name ~ " must be a whole number in the native int range");
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private void finishParamUpdate(c.nlopt_result code)
+        {
+            if (code == c.NLOPT_OUT_OF_MEMORY)
+            {
+                // NLopt 2.11.0 can leave a partially allocated parameter table.
+                // Even nlopt_destroy may access it. Abandon only this native handle.
+                owner.handle = null;
+                state = null;
+                throw new NloptException(code, "NLopt ran out of memory setting a parameter; optimizer is unusable");
+            }
+            state.check(code);
+        }
+
+        /** Set or replace a named algorithm parameter between solves.
+            Params:
+                name = Case-sensitive native parameter name of at most 1023 bytes without NUL.
+                value = Numeric setting interpreted by the selected algorithm. MMA and CCSAQ
+                    require whole numbers for integer settings and zero or one for switches.
+            Throws: Exception for an invalid name or value, inactive or running optimizer,
+                native failure, or an attempt to set dual_algorithm on MMA or CCSAQ.
+                A native out-of-memory error makes this optimizer unusable.
+        */
+        void setParam(string name, double value)
+        {
+            auto s = idle();
+            auto key = parameterName(name);
+            if (s.solver.algorithm == c.NLOPT_LD_MMA || s.solver.algorithm == c.NLOPT_LD_CCSAQ)
+                checkMmaCcsaqParam(name, value);
+            finishParamUpdate(c.nlopt_set_param(s.handle, key, value));
+        }
+
+        ///
+        unittest
+        {
+            auto opt = Optimizer(Algorithm.ldMMA, 2);
+            opt.setParam("inner_maxeval", 20);
+        }
+
+        /** Read an explicitly set parameter or return a caller-supplied fallback.
+            Params:
+                name = Case-sensitive native parameter name of at most 1023 bytes without NUL.
+                fallback = Value to return when the parameter is absent.
+            Returns: The stored double, or fallback if the name has never been set.
+            Throws: Exception for an invalid name or inactive optimizer.
+        */
+        double getParam(string name, double fallback) const
+        {
+            enforce(state, "Optimizer has no native handle");
+            // The C getters take a mutable pointer typedef but only read the parameter table.
+            return c.nlopt_get_param(cast(c.nlopt_opt) state.handle, parameterName(name), fallback);
+        }
+
+        /** Check whether a named parameter has been explicitly set.
+            Params:
+                name = Case-sensitive native parameter name of at most 1023 bytes without NUL.
+            Returns: True if a value is stored, even if the algorithm ignores this name.
+            Throws: Exception for an invalid name or inactive optimizer.
+        */
+        bool hasParam(string name) const
+        {
+            enforce(state, "Optimizer has no native handle");
+            return c.nlopt_has_param(cast(c.nlopt_opt) state.handle, parameterName(name)) != 0;
+        }
+
+        unittest
+        {
+            import std.exception : assertThrown;
+            auto opt = Optimizer(Algorithm.ldMMA, 1);
+            auto key = new char[1023];
+            key[] = 'a';
+            auto name = key.idup;
+            assert(!opt.hasParam(name) && opt.getParam(name, -1) == -1);
+            opt.setParam(name, 0);
+            assert(opt.hasParam(name) && opt.getParam(name, -1) == 0);
+            opt.setParam(name, 2);
+            foreach (invalid; [name ~ "a", "a\0b"])
+            {
+                assertThrown(opt.setParam(invalid, 3));
+                assertThrown(opt.hasParam(invalid));
+                assertThrown(opt.getParam(invalid, -1));
+            }
+            assert(!opt.hasParam("a") && opt.getParam(name, -1) == 2);
+        }
+
+        unittest
+        {
+            import std.exception : assertThrown;
+            foreach (algorithm; [c.NLOPT_LD_MMA, c.NLOPT_LD_CCSAQ])
+            {
+                auto opt = Optimizer(algorithm, 1);
+                foreach (name; ["dual_maxeval", "inner_maxeval", "verbosity"])
+                {
+                    opt.setParam(name, int.max);
+                    foreach (invalid; [double.nan, double.infinity, -double.infinity,
+                            int.max + 1.0, int.min - 1.0, 0.5])
+                        assertThrown(opt.setParam(name, invalid));
+                    assert(opt.getParam(name, 0) == int.max);
+                }
+                assertThrown(opt.setParam("verbosity", -1));
+                foreach (name; ["always_improve", "inner_gradients"])
+                {
+                    opt.setParam(name, 1);
+                    assertThrown(opt.setParam(name, 2));
+                    assert(opt.getParam(name, 0) == 1);
+                }
+                opt.setParam("dual_ftol_rel", 0.125);
+                assert(opt.getParam("dual_ftol_rel", 0) == 0.125);
+            }
+        }
+
+        unittest
+        {
+            import std.exception : assertThrown;
+            // Model the native error with a healthy handle so the test can reclaim it.
+            auto opt = Optimizer(Algorithm.ldMMA, 1);
+            auto handle = opt.owner.handle;
+            auto before = destructions;
+            c.nlopt_set_munge(handle, &countDestruction, null);
+            try { opt.finishParamUpdate(c.NLOPT_OUT_OF_MEMORY); assert(0); }
+            catch (NloptException e) { assert(e.code == c.NLOPT_OUT_OF_MEMORY); }
+            assertThrown(opt.getParam("inner_maxeval", 0));
+            assertThrown(opt.setParam("inner_maxeval", 10));
+            destroy(opt);
+            assert(destructions == before);
+            c.nlopt_destroy(handle);
+            assert(destructions == before + 1);
+        }
+    }
+
     private void setObjective(alias register)(Objective objective)
     {
         auto s = idle();

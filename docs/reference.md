@@ -114,9 +114,24 @@ An objective or constraint callback can call `opt.forceStop()` on the active opt
 
 ## Named algorithm parameters
 
-Some algorithms expose additional settings by name. For these, use `import c = nloptd.raw;` and the upstream parameter functions, such as `c.nlopt_set_param` and `c.nlopt_get_param`, if declared by your installed header. For example, MMA accepts `"inner_maxeval"` to limit its inner iterations.
+Use `setParam` to set or replace an algorithm-specific numeric setting between solves. For example, MMA accepts `"inner_maxeval"` to limit its inner iterations:
 
-These calls require a native handle. To use them, create and configure the solve through the raw API with `c.nlopt_create`, check the native result codes, and release the handle with `c.nlopt_destroy`. The high-level optimizer keeps its handle private. The same raw module provides other operations such as native getters and preconditioned objectives. [Upstream algorithm-specific parameters](https://nlopt.readthedocs.io/en/latest/NLopt_Reference/#algorithm-specific-parameters)
+```d
+auto opt = Optimizer(Algorithm.ldMMA, 2);
+opt.setParam("inner_maxeval", 20);
+assert(opt.hasParam("inner_maxeval"));
+assert(opt.getParam("inner_maxeval", 0) == 20);
+```
+
+`getParam(name, fallback)` returns your fallback when the name is absent. `hasParam(name)` reports whether a value was explicitly set. NLopt can store names the selected algorithm ignores. Names are case-sensitive and may contain up to 1023 bytes with no embedded NUL. These methods are available when the installed header provides the named-parameter API.
+
+For MMA and CCSAQ, select the dual algorithm with `setLocalOptimizer`. The wrapper rejects `setParam("dual_algorithm", ...)` on those optimizers because a native named override would take precedence over the validated subsidiary solver regardless of setter order. Other dual settings, such as `"dual_ftol_rel"`, can be set by name. [Subsidiary optimizers](#subsidiary-optimizers) · [Upstream algorithm-specific parameters](https://nlopt.readthedocs.io/en/latest/NLopt_Reference/#algorithm-specific-parameters)
+
+MMA and CCSAQ read `inner_maxeval`, `dual_maxeval`, and `verbosity` as integers. Supply whole numbers in the D `int` range, with a nonnegative value for `verbosity`. The switches `inner_gradients` and `always_improve` accept zero or one. If validation fails, the previous setting is preserved.
+
+If NLopt reports an out-of-memory error while storing a parameter, create a new optimizer before continuing. NLopt can leave its parameter table incomplete on this path. The wrapper makes the affected optimizer inert and leaves its native allocation for the operating system to reclaim at process exit.
+
+Copying an optimizer with named parameters is a separate case. In NLopt 2.11.0, allocation failure while copying the parameter table can terminate the process inside NLopt, before the D wrapper receives an error. This can happen when registering a [subsidiary optimizer](optimizer.md#subsidiary-optimizers).
 
 ## Performing the optimization
 
