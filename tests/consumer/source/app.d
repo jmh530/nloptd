@@ -41,6 +41,9 @@ private void testInitialStep()
     opt.setXTolAbs([1e-8, 1e-6]);
     opt.setMaxEvaluations(500);
     double[2] point = [0, 0];
+    double[2] steps;
+    opt.getInitialStep(point[], steps[]);
+    assert(steps == [0.1, 20.0]);
     auto result = opt.optimizeInPlace(point[]);
     assert(abs(point[0] - 0.5) < 1e-6 && abs(point[1] - 100) < 1e-4);
     assert(result.value < 1e-10);
@@ -73,6 +76,9 @@ private void testBounds()
     opt.setUpperBounds(upper[]);
     lower[] = 0;
     upper[] = 1;
+    opt.getLowerBounds(lower[]);
+    opt.getUpperBounds(upper[]);
+    assert(lower == [-1, -5] && upper == [5, 2]);
     assertThrown(opt.setLowerBounds(lower[0 .. 1]));
     assertThrown(opt.setUpperBounds([0.0, 0.0, 0.0]));
     result = opt.optimizeInPlace(point[]);

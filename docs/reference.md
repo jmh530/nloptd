@@ -56,6 +56,14 @@ opt.setUpperBounds([2.0, double.infinity]);
 
 Here both variables must be nonnegative and only the first has a finite upper bound. Bounds default to negative and positive infinity. The initial point must satisfy every bound, and NLopt keeps subsequent evaluations within them. Equal lower and upper bounds fix a variable at its starting value.
 
+To read the current bounds between solves, pass a writable slice of length `opt.dimension` to each getter. NLopt copies its bounds into your storage, including infinities for unbounded variables.
+
+```d
+double[2] lower, upper;
+opt.getLowerBounds(lower[]);
+opt.getUpperBounds(upper[]);
+```
+
 ## Nonlinear constraints
 
 A scalar constraint uses the same callback signature as the objective. Return a residual `c(x)`, and fill in its gradient when requested. Register an inequality for `c(x) ≤ 0` or an equality for `c(x) = 0`. For example, to impose `x[0] + x[1] ≤ 3`:
@@ -197,6 +205,14 @@ Set the objective, bounds, and constraints on the parent. NLopt copies the subsi
 ## Initial step size
 
 Derivative-free local algorithms such as Nelder–Mead use initial steps to explore around the starting point. With variables on different scales, use `opt.setInitialStep([0.1, 20.0])` for a two-variable problem. A scalar applies the same step to each variable. Each step is signed and must be nonzero. NLopt copies the values. Call `opt.resetInitialStep()` to resume automatic selection from the starting point and bounds. [Initial step example](optimizer.md#initial-steps-for-derivative-free-optimization)
+
+To inspect the steps before a solve, pass a proposed starting point and an equally sized output buffer to `getInitialStep`. Both lengths must match `opt.dimension`. The query returns explicit steps when configured. In automatic mode, NLopt computes steps from the supplied point and current bounds each time and may allocate temporary native storage.
+
+```d
+double[2] point = [0.5, 100.0];
+double[2] steps;
+opt.getInitialStep(point[], steps[]);
+```
 
 ## Population size
 
