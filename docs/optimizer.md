@@ -108,6 +108,8 @@ auto opt = Optimizer(Algorithm.auglag, 1);
 
 Calling the setter again replaces the local solver. A dimension mismatch preserves the existing configuration. If NLopt reports an out-of-memory error while copying a replacement, install a local solver again before retrying the solve.
 
+NLopt 2.11.0 has a limitation when the subsidiary has named parameters. If allocation of the copied parameter table fails, NLopt can crash during cleanup before `setLocalOptimizer` receives an error. [Native copy implementation](https://github.com/stevengj/nlopt/blob/v2.11.0/src/api/options.c#L227-L237)
+
 All AUGLAG variants used through `Optimizer`, including legacy algorithm IDs, require an explicit local solver before a solve or before installation as another optimizer's subsidiary. You can register constraints before choosing the local solver. Callers using NLopt's legacy process-wide defaults can still access them through `nloptd.raw`.
 
 MMA and CCSAQ create their dual solver from the selected algorithm and stopping criteria. This discards the local solver AUGLAG needs, so `setLocalOptimizer` rejects all AUGLAG variants in that position and preserves the previously configured solver.

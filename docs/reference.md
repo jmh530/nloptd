@@ -127,6 +127,12 @@ assert(opt.getParam("inner_maxeval", 0) == 20);
 
 For MMA and CCSAQ, select the dual algorithm with `setLocalOptimizer`. The wrapper rejects `setParam("dual_algorithm", ...)` on those optimizers because a native named override would take precedence over the validated subsidiary solver regardless of setter order. Other dual settings, such as `"dual_ftol_rel"`, can be set by name. [Subsidiary optimizers](#subsidiary-optimizers) · [Upstream algorithm-specific parameters](https://nlopt.readthedocs.io/en/latest/NLopt_Reference/#algorithm-specific-parameters)
 
+MMA and CCSAQ read `inner_maxeval`, `dual_maxeval`, and `verbosity` as integers. Supply whole numbers in the D `int` range, with a nonnegative value for `verbosity`. The switches `inner_gradients` and `always_improve` accept zero or one. If validation fails, the previous setting is preserved.
+
+If NLopt reports an out-of-memory error while storing a parameter, create a new optimizer before continuing. NLopt can leave its parameter table incomplete on this path. The wrapper makes the affected optimizer inert and leaves its native allocation for the operating system to reclaim at process exit.
+
+Copying an optimizer with named parameters is a separate case. In NLopt 2.11.0, allocation failure while copying the parameter table can terminate the process inside NLopt, before the D wrapper receives an error. This can happen when registering a [subsidiary optimizer](optimizer.md#subsidiary-optimizers).
+
 ## Performing the optimization
 
 Pass a writable `double[]` of the configured dimension to `optimizeInPlace`. Its contents are the initial guess on entry and the final point on return. To keep the initial guess, pass a copy made with `.dup`. The following complete program minimizes the squared distance to 3 with an upper bound of 2. Its solution is 2, where the objective value is 1.
