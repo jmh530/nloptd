@@ -524,6 +524,88 @@ struct Optimizer
         return state;
     }
 
+    static if (__traits(hasMember, c, "nlopt_set_param"))
+    {
+        private static const(char)* parameterName(string name)
+        {
+            import std.string : toStringz;
+            enforce(name.length < 1024, "Parameter name must be at most 1023 bytes");
+            foreach (char ch; name)
+                enforce(ch != 0, "Parameter name contains a NUL byte");
+            return name.toStringz;
+        }
+
+        /** Set or replace a named algorithm parameter between solves.
+            Params:
+                name = Case-sensitive native parameter name of at most 1023 bytes without NUL.
+                value = Numeric setting interpreted by the selected algorithm.
+            Throws: Exception for an invalid name, inactive or running optimizer, native failure,
+                or an attempt to set dual_algorithm on MMA or CCSAQ.
+        */
+        void setParam(string name, double value)
+        {
+            auto s = idle();
+            auto key = parameterName(name);
+            if (name == "dual_algorithm")
+                enforce(s.solver.algorithm != c.NLOPT_LD_MMA && s.solver.algorithm != c.NLOPT_LD_CCSAQ,
+                        "Use setLocalOptimizer to select the MMA or CCSAQ dual solver");
+            s.check(c.nlopt_set_param(s.handle, key, value));
+        }
+
+        ///
+        unittest
+        {
+            auto opt = Optimizer(Algorithm.ldMMA, 2);
+            opt.setParam("inner_maxeval", 20);
+        }
+
+        /** Read an explicitly set parameter or return a caller-supplied fallback.
+            Params:
+                name = Case-sensitive native parameter name of at most 1023 bytes without NUL.
+                fallback = Value to return when the parameter is absent.
+            Returns: The stored double, or fallback if the name has never been set.
+            Throws: Exception for an invalid name or inactive optimizer.
+        */
+        double getParam(string name, double fallback) const
+        {
+            enforce(state, "Optimizer has no native handle");
+            // The C getters take a mutable pointer typedef but only read the parameter table.
+            return c.nlopt_get_param(cast(c.nlopt_opt) state.handle, parameterName(name), fallback);
+        }
+
+        /** Check whether a named parameter has been explicitly set.
+            Params:
+                name = Case-sensitive native parameter name of at most 1023 bytes without NUL.
+            Returns: True if a value is stored, even if the algorithm ignores this name.
+            Throws: Exception for an invalid name or inactive optimizer.
+        */
+        bool hasParam(string name) const
+        {
+            enforce(state, "Optimizer has no native handle");
+            return c.nlopt_has_param(cast(c.nlopt_opt) state.handle, parameterName(name)) != 0;
+        }
+
+        unittest
+        {
+            import std.exception : assertThrown;
+            auto opt = Optimizer(Algorithm.ldMMA, 1);
+            auto key = new char[1023];
+            key[] = 'a';
+            auto name = key.idup;
+            assert(!opt.hasParam(name) && opt.getParam(name, -1) == -1);
+            opt.setParam(name, 0);
+            assert(opt.hasParam(name) && opt.getParam(name, -1) == 0);
+            opt.setParam(name, 2);
+            foreach (invalid; [name ~ "a", "a\0b"])
+            {
+                assertThrown(opt.setParam(invalid, 3));
+                assertThrown(opt.hasParam(invalid));
+                assertThrown(opt.getParam(invalid, -1));
+            }
+            assert(!opt.hasParam("a") && opt.getParam(name, -1) == 2);
+        }
+    }
+
     private void setObjective(alias register)(Objective objective)
     {
         auto s = idle();

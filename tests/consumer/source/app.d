@@ -433,7 +433,16 @@ private void testDualSolverReplacement()
     foreach (algorithm; [c.NLOPT_LD_MMA, c.NLOPT_LD_CCSAQ])
     {
         auto opt = Optimizer(algorithm, 1);
+        static if (__traits(hasMember, c, "nlopt_set_param"))
+            assertThrown(opt.setParam("dual_algorithm", c.NLOPT_AUGLAG));
         opt.setLocalOptimizer(slsqp);
+        static if (__traits(hasMember, c, "nlopt_set_param"))
+        {
+            assertThrown(opt.setParam("dual_algorithm", c.NLOPT_LN_NELDERMEAD));
+            assert(!opt.hasParam("dual_algorithm"));
+            opt.setParam("inner_maxeval", 20);
+            assert(opt.getParam("inner_maxeval", 0) == 20);
+        }
         opt.setXTolRel(1e-8);
         opt.setMaxEvaluations(200);
         opt.setMinObjective((x, grad) {
