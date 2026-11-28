@@ -6,12 +6,12 @@ For background on how nloptd passes points and derivatives to D functions, see [
 
 Mir describes the shape and strides of a view as well as its elements. The strides determine whether the selected elements occupy consecutive memory in the order the solver expects.
 
-For a `Contiguous` ndslice whose `.field` is a writable `double[]`, set the optimizer dimension to the total element count. Either call below operates on that storage.
+For a `Contiguous` ndslice of any rank whose `.field` is a writable `double[]`, set the optimizer dimension to the total element count. Either call below operates on that storage.
 
 | Pass the ndslice | Pass its backing array |
 | --- | --- |
 | `opt.optimizeInPlace(point)` | `opt.optimizeInPlace(point.field)` |
-| Direct overload on the development branch | Also available in nloptd 0.3.0 |
+| Available since nloptd 0.4.0 | Also available in nloptd 0.3.0 |
 
 For a view into a larger array, use the layout of the selected view:
 

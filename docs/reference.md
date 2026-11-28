@@ -168,7 +168,7 @@ void main()
 }
 ```
 
-For another run, set the desired initial values in the point before calling `optimizeInPlace` again. A contiguous Mir ndslice backed by a writable `double[]` can also be passed directly on this branch. With nloptd 0.3.0, pass its `.field`. [Mir interoperability](mir.md)
+For another run, set the desired initial values in the point before calling `optimizeInPlace` again. Starting with nloptd 0.4.0, you can pass a contiguous Mir ndslice backed by a writable `double[]` directly to `optimizeInPlace`. With nloptd 0.3.0, pass its `.field`. [Mir interoperability](mir.md)
 
 ### Return values
 

@@ -76,7 +76,7 @@ From the nloptd repository root, run `dub run --root=example`. To run the downst
 From your DUB project directory, add nloptd from the registry:
 
 ```sh
-dub add nloptd@0.3.0
+dub add nloptd
 ```
 
 To try the [first solve](#a-first-solve) in a new DUB application, save the example as `source/app.d` and run `dub run` with the NLopt environment settings for your platform.
